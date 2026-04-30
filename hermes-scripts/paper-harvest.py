@@ -1,0 +1,656 @@
+"""Paper harvester — fills Zotero from arXiv + OpenReview (ICLR/ICML/NeurIPS) + CVF (CVPR).
+
+Scope per user decision 2026-04-23:
+  - CCF-A conferences only: ICLR, ICML, NeurIPS, CVPR
+  - Papers from 2025 onward, newest first
+  - Max 20 new items per cron tick (don't flood library)
+  - Dedup against existing Zotero library by arxiv_id / OpenReview id / DOI
+  - Push to the pre-created 'Auto-Harvest' collection
+
+Architecture: direct source-API calls (no translation-server needed for these
+structured sources). PDFs stay in Zotero via the web API's attachment support.
+The Obsidian-side note generation is a separate downstream job — this script
+only populates the source layer.
+"""
+import json
+import os
+import re
+import time
+import argparse
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
+from pathlib import Path
+
+from beatless_config import CONFIG
+
+MARKER = str(CONFIG.shared_file(".last-paper-harvest"))
+STATUS_FILE = str(CONFIG.shared_file(".last-paper-harvest-status"))
+
+ZOT_KEY = CONFIG.zotero_api_key
+ZOT_USER = CONFIG.zotero_user_id
+# Parent collection "Auto-Harvest" (kept for backward compat only).
+AUTO_HARVEST_COLLECTION = CONFIG.zotero_auto_harvest_collection
+
+UA = f"paper-harvest/0.1 ({CONFIG.user_agent_contact})"
+HEADERS = {"User-Agent": UA}
+
+MAX_PER_TICK = 20
+ARXIV_CATS = ["cs.LG", "cs.CL", "cs.CV", "cs.AI"]
+EARLIEST_YEAR = 2025  # user said post-2025 only
+
+# Two target collections:
+#   A-Tier  — CCF-A venue papers (primary target, quality-guaranteed)
+#   Scouting — famous-lab arXiv drops (secondary, pre-publication material)
+A_TIER_COLLECTION = CONFIG.zotero_a_tier_collection
+SCOUTING_COLLECTION = CONFIG.zotero_scouting_collection
+
+# Famous labs — used to filter arXiv results by affiliation signal.
+# Match is case-insensitive substring; present in author comment or affiliation
+# field when provided.
+FAMOUS_LABS = [
+    # Western frontier labs
+    "anthropic", "openai", "deepmind", "google research", "google brain",
+    "meta ai", "meta fair", "fair labs",
+    "microsoft research", "msr", "msft research",
+    "apple machine learning", "apple ai",
+    "nvidia research", "nvidia",
+    "allen institute", "ai2", "allenai",
+    "mistral",
+    # Chinese labs
+    "moonshot", "kimi",
+    "bytedance seed", "bytedance", "seed team",
+    "zhipu", "glm",
+    "minimax", "hailuo",
+    "alibaba", "qwen", "tongyi",
+    "tencent", "hunyuan",
+    "baidu", "ernie",
+    "deepseek",
+    "01.ai", "yi-lightning",
+    "xiaomi",
+    # Top research universities (CCF-A author signal)
+    "stanford", "mit", "cmu", "carnegie mellon",
+    "berkeley", "eth zurich", "ethz",
+    "tsinghua", "peking university", "pku",
+    "oxford", "cambridge",
+    "princeton", "harvard", "yale",
+    "toronto", "waterloo",
+]
+
+# OpenReview venues — CCF-A and adjacent top venues.
+# Each tuple: (venueid, slug_tag, year_int_for_filter).
+# year_int lets us reject misclassified older entries.
+OPENREVIEW_VENUES = [
+    # Core CCF-A ML/NLP
+    ("ICLR.cc/2026/Conference",    "iclr-2026",    2026),
+    ("ICLR.cc/2025/Conference",    "iclr-2025",    2025),
+    ("ICML.cc/2025/Conference",    "icml-2025",    2025),
+    ("NeurIPS.cc/2025/Conference", "neurips-2025", 2025),
+    # Language-model flagship (widely treated as top-tier)
+    ("COLM/2025/Conference",       "colm-2025",    2025),
+]
+
+# CVF hosts CVPR + ICCV open-access; both CCF-A for computer vision.
+# Each tuple: (conference_name_in_url, slug_tag, year).
+CVF_VENUES = [
+    ("CVPR", "cvpr-2026", 2026),
+    ("CVPR", "cvpr-2025", 2025),
+    ("ICCV", "iccv-2025", 2025),
+]
+
+
+def http_get(url, timeout=25):
+    req = urllib.request.Request(url, headers=HEADERS)
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read().decode("utf-8", errors="ignore")
+
+
+def zot_request(method, path, body=None):
+    url = f"https://api.zotero.org/users/{ZOT_USER}/{path}"
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(
+        url, data=data, method=method,
+        headers={"Zotero-API-Key": ZOT_KEY, "Content-Type": "application/json",
+                 "User-Agent": UA},
+    )
+    with urllib.request.urlopen(req, timeout=30) as r:
+        raw = r.read().decode("utf-8", errors="ignore")
+    return json.loads(raw) if raw else {}
+
+
+def fetch_existing_identifiers():
+    """Return set of arxiv_ids + DOIs + titles already in the library.
+
+    We paginate the items endpoint, read archiveID + DOI + title, build a
+    fast-lookup set for dedup before POSTing.
+    """
+    ids = set()
+    start = 0
+    while True:
+        url = f"https://api.zotero.org/users/{ZOT_USER}/items?limit=100&start={start}&format=json"
+        req = urllib.request.Request(url, headers={"Zotero-API-Key": ZOT_KEY, "User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            total = int(r.headers.get("Total-Results", "0"))
+            data = json.loads(r.read().decode("utf-8"))
+        for it in data:
+            d = it.get("data", {})
+            if d.get("archiveID"):
+                ids.add(d["archiveID"].strip().lower())
+            if d.get("DOI"):
+                ids.add(d["DOI"].strip().lower())
+            if d.get("url"):
+                ids.add(d["url"].strip().lower())
+            if d.get("title"):
+                ids.add(("title", d["title"].strip().lower()[:80]))
+        start += 100
+        if start >= total:
+            break
+    return ids
+
+
+def zot_post_items(items):
+    """Batch push items (Zotero allows up to 50 per POST)."""
+    created = []
+    failed = []
+    for i in range(0, len(items), 50):
+        batch = items[i:i + 50]
+        try:
+            resp = zot_request("POST", "items", batch)
+            for k, v in (resp.get("successful") or {}).items():
+                created.append({"key": v["key"],
+                                "title": v.get("data", {}).get("title", "<no title>")[:80]})
+            for k, v in (resp.get("failed") or {}).items():
+                failed.append({"i": k, "msg": v.get("message", "?")[:200]})
+        except urllib.error.HTTPError as e:
+            failed.append({"batch_start": i, "http": e.code, "body": e.read().decode()[:200]})
+        time.sleep(1)
+    return created, failed
+
+
+# ---------------- arXiv ----------------
+
+def parse_arxiv_entry(entry, ns):
+    title = entry.find("atom:title", ns).text.strip().replace("\n", " ")
+    abstract = entry.find("atom:summary", ns).text.strip().replace("\n", " ")[:900]
+    published = entry.find("atom:published", ns).text[:10]
+    # id looks like http://arxiv.org/abs/2510.26692v1
+    raw_id = entry.find("atom:id", ns).text
+    m = re.search(r"abs/([0-9]+\.[0-9]+)", raw_id)
+    arxiv_id = m.group(1) if m else None
+    authors = []
+    for a in entry.findall("atom:author", ns):
+        nm = a.find("atom:name", ns).text.strip()
+        parts = nm.rsplit(" ", 1)
+        first = parts[0] if len(parts) > 1 else ""
+        last = parts[-1]
+        authors.append({"creatorType": "author", "firstName": first, "lastName": last})
+    cats = [c.get("term") for c in entry.findall("atom:category", ns)]
+    return {
+        "arxiv_id": arxiv_id, "title": title, "abstract": abstract,
+        "published": published, "authors": authors, "cats": cats,
+    }
+
+
+def _collect_arxiv_search(search_url, ns, famous_only=False):
+    """Run a single arXiv search URL, return list of parsed entries.
+
+    If famous_only=True, drop entries whose affiliation/comment fields don't
+    match any FAMOUS_LABS name. Each entry gets `_famous_lab` set to the
+    matched lab slug when applicable.
+    """
+    try:
+        xml_text = http_get(search_url, timeout=30)
+    except Exception as e:
+        print(f"arxiv query failed: {e}")
+        return []
+    root = ET.fromstring(xml_text)
+    out = []
+    for entry in root.findall("atom:entry", ns):
+        try:
+            p = parse_arxiv_entry(entry, ns)
+        except Exception:
+            continue
+        if not p["arxiv_id"]:
+            continue
+        # Scan raw entry XML for lab signals
+        entry_text = ET.tostring(entry, encoding="unicode")
+        lab = detect_famous_lab(entry_text)
+        if lab:
+            p["_famous_lab"] = lab
+        if famous_only and not lab:
+            continue
+        out.append(p)
+    return out
+
+
+def fetch_arxiv_famous_labs(limit_per_cat=25, year_min=None):
+    """arXiv newest-first per category, filtered to entries that mention a
+    famous lab in the affiliation or comment fields.
+
+    This is the cron-path arXiv fetcher: it only returns items with a strong
+    quality signal (affiliation match), so noise stays out of A-Tier.
+    """
+    ns = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
+    ymin = year_min if year_min is not None else EARLIEST_YEAR
+    collected = []
+    for cat in ARXIV_CATS:
+        q = urllib.parse.quote(f"cat:{cat}")
+        url = (f"https://export.arxiv.org/api/query?search_query={q}"
+               f"&sortBy=submittedDate&sortOrder=descending&max_results={limit_per_cat}")
+        entries = _collect_arxiv_search(url, ns, famous_only=True)
+        for p in entries:
+            year = int(p["published"][:4]) if p["published"] else 0
+            if year < ymin:
+                continue
+            p["_topic"] = cat
+            collected.append(p)
+        time.sleep(4)
+    # dedup by arxiv_id
+    seen = set()
+    uniq = []
+    for p in collected:
+        if p["arxiv_id"] in seen:
+            continue
+        seen.add(p["arxiv_id"])
+        uniq.append(p)
+    return uniq
+
+
+def fetch_arxiv_new(max_per_cat=15, year_min=None):
+    """arXiv listings, newest first per category. Filter to year_min+ (default EARLIEST_YEAR)."""
+    ns = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
+    ymin = year_min if year_min is not None else EARLIEST_YEAR
+    collected = []
+    for cat in ARXIV_CATS:
+        q = urllib.parse.quote(f"cat:{cat}")
+        url = (f"https://export.arxiv.org/api/query?search_query={q}"
+               f"&sortBy=submittedDate&sortOrder=descending&max_results={max_per_cat}")
+        entries = _collect_arxiv_search(url, ns)
+        for p in entries:
+            year = int(p["published"][:4]) if p["published"] else 0
+            if year < ymin:
+                continue
+            p["_topic"] = cat
+            collected.append(p)
+        time.sleep(3)
+    seen = set()
+    uniq = []
+    for p in collected:
+        if p["arxiv_id"] in seen:
+            continue
+        seen.add(p["arxiv_id"])
+        uniq.append(p)
+    return uniq
+
+
+def fetch_arxiv_queries(queries, year_min=2026, per_query_limit=20, cats=None):
+    """Run a batch of keyword queries against arXiv.
+
+    Args:
+        queries: list of (topic_tag, query_string) tuples.
+                 topic_tag becomes a Zotero tag on the item.
+                 query_string uses arXiv search grammar,
+                 e.g. 'abs:"weak-to-strong" AND cat:cs.LG'.
+        year_min: drop papers before this year.
+        per_query_limit: max results per query (arXiv caps at 2000).
+        cats: optional list of cats to AND into each query.
+              e.g. ["cs.LG","cs.CL","cs.CV","cs.AI"].
+
+    Returns list of parsed entries, each with `_topic` field set.
+    """
+    ns = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
+    collected = []
+    for tag, raw_query in queries:
+        q = raw_query
+        if cats:
+            cat_clause = " OR ".join(f"cat:{c}" for c in cats)
+            q = f"({raw_query}) AND ({cat_clause})"
+        encoded = urllib.parse.quote(q)
+        url = (f"https://export.arxiv.org/api/query?search_query={encoded}"
+               f"&sortBy=submittedDate&sortOrder=descending&max_results={per_query_limit}")
+        entries = _collect_arxiv_search(url, ns)
+        kept = 0
+        for p in entries:
+            year = int(p["published"][:4]) if p["published"] else 0
+            if year < year_min:
+                continue
+            p["_topic"] = tag
+            collected.append(p)
+            kept += 1
+        print(f"   query[{tag}] raw={len(entries)} kept={kept}")
+        time.sleep(4)  # be nicer than the 3s default — bulk runs
+    # dedup within run
+    seen = set()
+    uniq = []
+    for p in collected:
+        if p["arxiv_id"] in seen:
+            continue
+        seen.add(p["arxiv_id"])
+        uniq.append(p)
+    return uniq
+
+
+def detect_famous_lab(entry_xml_text):
+    """Return the first matching FAMOUS_LABS name found in entry's affiliation
+    or comment fields, or None.
+
+    arXiv doesn't reliably expose affiliations in Atom. We scan:
+      - <arxiv:affiliation> tags (when present)
+      - <arxiv:comment> tags (often contains "Camera-ready for X")
+      - <arxiv:journal_ref> if present
+    Case-insensitive substring match against FAMOUS_LABS.
+    """
+    text = entry_xml_text.lower()
+    for lab in FAMOUS_LABS:
+        if lab in text:
+            return lab
+    return None
+
+
+def arxiv_to_zotero_item(p, tier="scout", extra_tags=None):
+    """arXiv items default to Scouting tier. Pass tier='a' for famous-lab
+    papers that should land in A-Tier alongside CCF-A conference material.
+    """
+    tags = [{"tag": "auto-harvest"}, {"tag": "arxiv"}, {"tag": f"tier:{tier}"}]
+    tags += [{"tag": c} for c in p.get("cats", [])[:3]]
+    if p.get("_topic"):
+        tags.append({"tag": f"topic:{p['_topic']}"})
+    if p.get("_famous_lab"):
+        tags.append({"tag": f"affil:{p['_famous_lab']}"})
+    for t in (extra_tags or []):
+        tags.append({"tag": t})
+    target = A_TIER_COLLECTION if tier == "a" else SCOUTING_COLLECTION
+    return {
+        "itemType": "preprint",
+        "title": p["title"],
+        "creators": p["authors"],
+        "abstractNote": p["abstract"],
+        "repository": "arXiv",
+        "archiveID": f"arXiv:{p['arxiv_id']}",
+        "url": f"https://arxiv.org/abs/{p['arxiv_id']}",
+        "date": p["published"],
+        "libraryCatalog": "arXiv.org",
+        "tags": tags,
+        "collections": [target],
+    }
+
+
+# ---------------- OpenReview (ICLR / ICML / NeurIPS accepted) ----------------
+
+def fetch_openreview_venue(venueid, limit=25):
+    """OpenReview v2 REST API. Pull notes filtered by venueid content field."""
+    offset = 0
+    pulled = []
+    while len(pulled) < limit:
+        q = urllib.parse.quote(venueid)
+        url = (f"https://api2.openreview.net/notes?content.venueid={q}"
+               f"&limit={min(25, limit - len(pulled))}&offset={offset}&sort=cdate:desc")
+        try:
+            data = json.loads(http_get(url, timeout=30))
+        except Exception as e:
+            print(f"openreview {venueid}: fetch failed {e}")
+            break
+        notes = data.get("notes", [])
+        if not notes:
+            break
+        pulled.extend(notes)
+        if len(notes) < 25:
+            break
+        offset += 25
+        time.sleep(2)
+    return pulled
+
+
+def openreview_to_zotero_item(note, venue_tag):
+    content = note.get("content", {})
+    def gv(k):
+        v = content.get(k)
+        if isinstance(v, dict):
+            return v.get("value")
+        return v
+
+    title = (gv("title") or "").strip()
+    if not title:
+        return None
+    abstract = (gv("abstract") or "").strip()[:900]
+    # authors: list of full-name strings
+    author_names = gv("authors") or []
+    authors = []
+    for nm in author_names[:20]:
+        nm = nm.strip()
+        if not nm:
+            continue
+        parts = nm.rsplit(" ", 1)
+        authors.append({"creatorType": "author",
+                        "firstName": parts[0] if len(parts) > 1 else "",
+                        "lastName": parts[-1]})
+    # derive conf name + year
+    vid = gv("venueid") or gv("venue") or venue_tag
+    year = re.search(r"20\d{2}", vid or "")
+    year_str = year.group(0) if year else ""
+    # Build URL
+    nid = note.get("id", "")
+    url = f"https://openreview.net/forum?id={nid}" if nid else ""
+    return {
+        "itemType": "conferencePaper",
+        "title": title,
+        "creators": authors,
+        "abstractNote": abstract,
+        "conferenceName": vid,
+        "date": year_str,
+        "url": url,
+        "libraryCatalog": "OpenReview",
+        "extra": f"OpenReview: {nid}",
+        "tags": [{"tag": "auto-harvest"}, {"tag": "openreview"},
+                 {"tag": venue_tag}, {"tag": "tier:a"}],
+        "collections": [A_TIER_COLLECTION],
+    }
+
+
+# ---------------- CVF (CVPR open-access) ----------------
+
+def fetch_cvf_conference(conf_name, year, limit=15):
+    """Parse an accepted-papers index from openaccess.thecvf.com.
+
+    conf_name: 'CVPR' or 'ICCV' (anything the CVF url supports)
+    """
+    url = f"https://openaccess.thecvf.com/{conf_name}{year}"
+    try:
+        html = http_get(url, timeout=30)
+    except Exception as e:
+        print(f"cvf {conf_name}-{year}: fetch failed {e}")
+        return []
+    pat = re.compile(
+        r'<dt class="ptitle"><a href="([^"]+)">([^<]+)</a></dt>\s*<dd>\s*([^<]+)</dd>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    matches = pat.findall(html)[:limit]
+    out = []
+    for href, title, authors_str in matches:
+        title = re.sub(r"<[^>]+>", "", title).strip()
+        authors = []
+        for nm in [a.strip() for a in authors_str.split(",")]:
+            if not nm:
+                continue
+            parts = nm.rsplit(" ", 1)
+            authors.append({"creatorType": "author",
+                            "firstName": parts[0] if len(parts) > 1 else "",
+                            "lastName": parts[-1]})
+        if href.startswith("/"):
+            href = "https://openaccess.thecvf.com" + href
+        out.append({"title": title, "url": href, "authors": authors,
+                    "year": year, "conf": conf_name})
+    return out
+
+
+def cvf_to_zotero_item(p, venue_tag):
+    return {
+        "itemType": "conferencePaper",
+        "title": p["title"],
+        "creators": p["authors"],
+        "conferenceName": f"{p['conf']} {p['year']}",
+        "date": str(p["year"]),
+        "url": p["url"],
+        "libraryCatalog": "CVF Open Access",
+        "tags": [{"tag": "auto-harvest"}, {"tag": "cvf"},
+                 {"tag": venue_tag}, {"tag": "tier:a"}],
+        "collections": [A_TIER_COLLECTION],
+    }
+
+
+# ---------------- Dedup + main ----------------
+
+def is_duplicate(zot_item, existing):
+    a = (zot_item.get("archiveID") or "").strip().lower()
+    if a and a in existing:
+        return True
+    u = (zot_item.get("url") or "").strip().lower()
+    if u and u in existing:
+        return True
+    t = (zot_item.get("title") or "").strip().lower()[:80]
+    if t and ("title", t) in existing:
+        return True
+    return False
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="fetch and deduplicate candidates, but do not write to Zotero",
+    )
+    parser.add_argument(
+        "--max-new",
+        type=int,
+        default=MAX_PER_TICK,
+        help=f"maximum new items to write, or to report in dry-run (default: {MAX_PER_TICK})",
+    )
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+    if args.max_new < 1:
+        print("ERROR: --max-new must be >= 1")
+        return 1
+
+    if not ZOT_KEY or not ZOT_USER:
+        print("ERROR: ZOTERO_API_KEY / ZOTERO_USER_ID not in env")
+        return 1
+
+    os.makedirs(os.path.dirname(STATUS_FILE), exist_ok=True)
+    summary = {
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "dry_run": args.dry_run,
+        "max_per_tick": args.max_new,
+        "existing_items": 0,
+        "arxiv_fetched": 0,
+        "openreview_fetched": 0,
+        "cvf_fetched": 0,
+        "fresh_candidates": 0,
+        "new_items_posted": 0,
+        "skipped_duplicates": 0,
+        "created_keys": [],
+        "errors": [],
+    }
+
+    print("== step 1: fetch existing Zotero identifiers ==")
+    try:
+        existing = fetch_existing_identifiers()
+        summary["existing_items"] = len(existing)
+        print(f"   {len(existing)} identifiers indexed")
+    except Exception as e:
+        summary["errors"].append(f"fetch_existing: {e}")
+        existing = set()
+
+    candidates = []  # list of (zotero_item_dict, source_tag)
+
+    # --- OpenReview (CCF-A: ICLR / ICML / NeurIPS / COLM) ---
+    print("== step 2: OpenReview CCF-A venues ==")
+    for venueid, tag, _year in OPENREVIEW_VENUES:
+        try:
+            notes = fetch_openreview_venue(venueid, limit=15)
+            print(f"   {tag}: {len(notes)} notes")
+            summary["openreview_fetched"] += len(notes)
+            for n in notes:
+                it = openreview_to_zotero_item(n, tag)
+                if it:
+                    candidates.append((it, tag))
+        except Exception as e:
+            summary["errors"].append(f"openreview {venueid}: {e}")
+        time.sleep(2)
+
+    # --- CVF (CCF-A: CVPR + ICCV) ---
+    print("== step 3: CVF CCF-A venues ==")
+    for conf, tag, year in CVF_VENUES:
+        try:
+            ps = fetch_cvf_conference(conf, year, limit=12)
+            summary["cvf_fetched"] += len(ps)
+            print(f"   {tag}: {len(ps)} entries")
+            for p in ps:
+                candidates.append((cvf_to_zotero_item(p, tag), tag))
+        except Exception as e:
+            summary["errors"].append(f"cvf-{tag}: {e}")
+        time.sleep(2)
+
+    # --- arXiv famous-lab filter (optional, supplementary to CCF-A) ---
+    # Cron path: only arXiv items with a famous-lab affiliation signal get in.
+    # Items land in A-Tier with tier:a + affil:<lab> tags so they can be
+    # distinguished from accepted conference papers.
+    print("== step 4: arXiv famous-lab filter ==")
+    try:
+        ax = fetch_arxiv_famous_labs(limit_per_cat=25)
+        summary["arxiv_fetched"] = len(ax)
+        print(f"   {len(ax)} famous-lab arXiv entries")
+        for p in ax:
+            it = arxiv_to_zotero_item(p, tier="a")
+            candidates.append((it, f"arxiv-{p.get('_famous_lab','?')}"))
+    except Exception as e:
+        summary["errors"].append(f"arxiv-famous: {e}")
+
+    # --- Dedup ---
+    print(f"== step 5: dedup ({len(candidates)} candidates) ==")
+    fresh = []
+    for it, tag in candidates:
+        if is_duplicate(it, existing):
+            summary["skipped_duplicates"] += 1
+            continue
+        fresh.append(it)
+        # update existing-set in-memory so same run doesn't double-add
+        if it.get("archiveID"):
+            existing.add(it["archiveID"].strip().lower())
+        if it.get("url"):
+            existing.add(it["url"].strip().lower())
+        if it.get("title"):
+            existing.add(("title", it["title"].strip().lower()[:80]))
+        if len(fresh) >= args.max_new:
+            break
+    summary["fresh_candidates"] = len(fresh)
+    print(f"   {len(fresh)} fresh (capped at {args.max_new})")
+
+    # --- Push ---
+    if args.dry_run:
+        print(f"== step 6: dry-run, not writing {len(fresh)} candidate items to Zotero ==")
+    elif fresh:
+        print(f"== step 6: push to Zotero ({len(fresh)} items) ==")
+        created, failed = zot_post_items(fresh)
+        summary["new_items_posted"] = len(created)
+        summary["created_keys"] = created
+        for f in failed:
+            summary["errors"].append(f"zot-post: {f}")
+        print(f"   created={len(created)}  failed={len(failed)}")
+    else:
+        print("== step 6: no new items this tick ==")
+
+    summary["finished_at"] = datetime.now(timezone.utc).isoformat()
+    with open(STATUS_FILE, "w") as f:
+        json.dump(summary, f, indent=2, default=str)
+    if not args.dry_run:
+        Path(MARKER).touch()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

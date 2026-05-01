@@ -1,7 +1,7 @@
 ---
 description: "Autonomous experiment loop. Quick mode: single-GPU, short budget, fast keep/discard. Full mode: dual-GPU A/B, long budget, convergence-era judging, Deep Research Pass. Auto-detects from workspace. Runs until SOTA or halt."
 argument-hint: "<experiment description> or \"resume\""
-allowed-tools: Bash, Read, Write, Grep, Glob, Agent, Skill, mcp__plugin_gsd_gsd__*
+allowed-tools: Bash, Read, Write, Grep, Glob, Skill, mcp__plugin_gsd_gsd__*
 ---
 
 # Experiment Run: Autonomous Loop
@@ -28,15 +28,15 @@ If `$ARGUMENTS` is "resume" or `progress.md` exists with prior rounds:
 
 | Integration | Invocation | Fallback |
 |-------------|-----------|----------|
-| Codex CLI | Agent tool → subagent_type `codex-cli` | Claude Edit + Bash test |
-| Gemini CLI | Agent tool → subagent_type `gemini-cli` | WebSearch + Claude reads key files |
+| Codex CLI | Current Codex executor | Manual block with evidence |
+| Gemini CLI | `gemini -p "<question>"` | Codex reads key files |
 | GSD | MCP `mcp__plugin_gsd_gsd__gsd_record_metric` | Direct file writes |
 | Planning-with-files | Skill `planning-with-files:plan` | Direct file writes |
-| Superpowers | Skill `superpowers:brainstorming` | Claude generates ideas directly |
+| Superpowers | Skill `superpowers:brainstorming` | Codex generates ideas directly |
 
-For Codex CLI and Gemini CLI, invoke each Agent once with prompt:
+For Gemini CLI, run one readiness check:
 ```
-Readiness check only. Verify the local CLI bridge is usable. Do not edit files.
+timeout 20 gemini -p "Reply exactly GEMINI_READY"
 ```
 
 Record `READY` / `UNAVAILABLE` in `progress.md`. Do NOT retry failed integrations during the loop.
@@ -73,15 +73,11 @@ Read best prior metric from `results.tsv` (lowest non-zero val_bpb or primary me
 
 #### Q2. Implement Experiment
 
-Invoke Codex for code changes:
-```
-Agent tool:
-  subagent_type: "codex-cli"
-  prompt: "Apply this single experiment to train.py only: [experiment description].
-  Keep changes minimal and coherent. Do not add imports for new packages.
-  Do not modify prepare.py or any other file."
-```
-**Fallback**: Claude edits via Edit tool directly.
+Use the current Codex executor for code changes:
+
+Apply this single experiment to `train.py` only: `[experiment description]`.
+Keep changes minimal and coherent. Do not add imports for new packages.
+Do not modify `prepare.py` or any other file.
 
 #### Q3. Commit
 ```bash
@@ -183,41 +179,37 @@ For each, specify in `task_plan.md`:
 - GPU binding (A=0, B=1)
 - Expected peak VRAM (must be ≤40 GB)
 
-#### F3. Delegate Code Changes (Codex)
+#### F3. Implement Code Changes (Codex)
+
+Use the current Codex executor:
 
 ```
-Agent tool:
-  subagent_type: "codex-cli"
-  prompt: "Implement two experiments for [project root]:
+Implement two experiments for [project root]:
 
-  Experiment A (GPU0): [hypothesis]
-  - Target files: [paths]
-  - Change: [diff scope]
-  - Output: run_<exp_A>_gpu0.sh with CUDA_VISIBLE_DEVICES=0
+Experiment A (GPU0): [hypothesis]
+- Target files: [paths]
+- Change: [diff scope]
+- Output: run_<exp_A>_gpu0.sh with CUDA_VISIBLE_DEVICES=0
 
-  Experiment B (GPU1): [hypothesis]
-  - Target files: [paths]
-  - Change: [diff scope]
-  - Output: run_<exp_B>_gpu1.sh with CUDA_VISIBLE_DEVICES=1
+Experiment B (GPU1): [hypothesis]
+- Target files: [paths]
+- Change: [diff scope]
+- Output: run_<exp_B>_gpu1.sh with CUDA_VISIBLE_DEVICES=1
 
-  Constraints: separate log/checkpoint dirs, VRAM ≤40GB each, wall-clock ≤[budget]h.
-  Return: diff summary, .sh paths, VRAM estimate, any sanity checks."
+Constraints: separate log/checkpoint dirs, VRAM ≤40GB each, wall-clock ≤[budget]h.
+Return: diff summary, .sh paths, VRAM estimate, any sanity checks.
 ```
 
 **Verify** returned scripts:
 ```bash
 grep -n CUDA_VISIBLE_DEVICES run_*_gpu{0,1}.sh  # each has exactly one, values match
 ```
-Neither script forks a second training. Log dirs are separated. If any check fails, send failure back to Codex.
-
-**Fallback**: Claude writes scripts directly.
+Neither script forks a second training. Log dirs are separated. If any check fails, fix it before running.
 
 #### F4. Delegate Literature Check (Gemini)
 
-```
-Agent tool:
-  subagent_type: "gemini-cli"
-  prompt: "For hypotheses A: [one line] and B: [one line] in [project domain]:
+```bash
+gemini -p "For hypotheses A: [one line] and B: [one line] in [project domain]:
   1. 3-5 closest 2025+ papers (title, venue, year, takeaway)
   2. Closest to hypothesis A? Closest to B?
   3. Strongest counter-argument to A

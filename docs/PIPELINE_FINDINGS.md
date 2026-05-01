@@ -1,5 +1,7 @@
 # Pipeline Findings — claude_code_cli, Heartbeat, Mailbox
 
+> Historical findings from the pre-Codex-primary routing stack. Treat `claude_code_cli`, Heartbeat, and Mailbox references here as archival context, not the current runtime.
+
 **Date**: 2026-04-09  
 **Scope**: Verify what the `claude_code_cli` router actually invokes, document the current Heartbeat architecture, flag the Mailbox robustness gap, and scope the "blog maintenance + good-first-issue feedback" workflow.
 

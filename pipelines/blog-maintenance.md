@@ -1,21 +1,20 @@
 ---
 name: blog-maintenance
-description: "Autonomous blog maintenance pipeline for ~/blog/ (Astro site). Audits existing posts, researches trending AI/ML topics via Gemini (gemini:gemini-consult agent), writes new posts, verifies build, and reviews quality via Codex (codex:codex-rescue agent). Use this skill when the user mentions blog maintenance, writing blog posts, auditing blog content, researching topics for the blog, or wants to update their technical blog."
+description: "Codex-primary blog maintenance pipeline for ~/blog/ (Astro site). Audits existing posts, researches trending AI/ML topics via Gemini CLI, writes or rewrites posts when explicitly invoked, verifies build, and reviews quality via Codex."
 ---
 
 # Blog Maintenance Pipeline
 
-Autonomous pipeline: audit existing posts -> research trending topics (Gemini agent) -> write new posts -> verify build -> quality review (Codex + Gemini agents).
+Codex-primary pipeline: audit existing posts -> research trending topics (Gemini CLI) -> write new posts when explicitly invoked -> verify build -> quality review (Codex + Gemini).
 
 ## Why This Architecture
 
-Previous versions put Codex/Gemini calls inside a `claude --print` prompt, where Claude could skip the Bash calls. This skill uses Claude Code's **Agent tool** to spawn `codex:codex-rescue` and `gemini:gemini-consult` as independent subagents that must execute.
+Earlier iterations nested secondary model calls inside higher-level wrappers, which made shell-side verification too easy to skip. This version runs under Codex directly and calls `gemini` as a standalone CLI only when a second model is useful.
 
 ## Execution Model
 
-- **Claude**: Primary writer, auditor, and orchestrator via Read/Write/Grep/Glob tools
-- **Gemini**: Research agent via `Agent` tool with `subagent_type: "gemini:gemini-consult"` (1M context window, good for broad research)
-- **Codex**: Quality review agent via `Agent` tool with `subagent_type: "codex:codex-rescue"`
+- **Codex**: Primary writer, auditor, orchestrator, and quality reviewer
+- **Gemini**: Research/translation second opinion via `gemini -p`
 - **Build**: `pnpm build` via Bash
 
 ## Context
@@ -28,7 +27,7 @@ Previous versions put Codex/Gemini calls inside a `claude --print` prompt, where
 
 ---
 
-## Phase 1: AUDIT (Claude direct)
+## Phase 1: AUDIT (Codex direct)
 
 Read all posts in `~/blog/src/content/blogs/*/index.mdx` using Read/Glob tools.
 
@@ -41,9 +40,9 @@ Keep audit results in context for Phase 3.
 
 ---
 
-## Phase 2: RESEARCH (Gemini Agent)
+## Phase 2: RESEARCH (Gemini CLI)
 
-Spawn **gemini:gemini-consult** via Agent tool for each research category. These can run in parallel.
+Run bounded `gemini -p` calls for each research category. These can run in parallel if the shell environment supports it.
 
 ### Agent: Research AI Thought Leaders
 
@@ -61,7 +60,7 @@ For each: source, key insights, suggested blog angle.
 
 ```
 Most impactful developments in AI agent frameworks in the last 2 weeks?
-Focus on: MCP protocol, Claude Code / Codex / Gemini CLI patterns, autonomous coding agents, multi-agent orchestration.
+Focus on: MCP protocol, Codex / Gemini CLI patterns, autonomous coding agents, multi-agent orchestration.
 For each: title, key technical insight, practical code pattern.
 ```
 
@@ -78,7 +77,7 @@ Select top 3 topics across all research results.
 
 ---
 
-## Phase 3: WRITE (Claude direct)
+## Phase 3: WRITE (Codex direct)
 
 ### New posts (write 2)
 
@@ -137,7 +136,7 @@ The blog supports EN/ZH switching. Every post should have a counterpart in the o
 3. **Translation is NOT literal** — adapt the content for the target audience:
    - English: more direct, reference international papers, explain Chinese-specific context
    - Chinese: can use more colloquial tech terms, reference Chinese ecosystem
-4. **Use Gemini for translation assist** — spawn `gemini:gemini-consult`:
+4. **Use Gemini for translation assist** — run `gemini -p`:
    ```
    Translate this blog post from Chinese to English. This is a technical blog targeting
    international AI/ML researchers. Do NOT translate literally — adapt idioms, restructure
@@ -164,9 +163,9 @@ cd ~/blog && pnpm build
 
 Must exit 0. Fix if it fails.
 
-### Parallel quality reviews — spawn BOTH agents in a single message:
+### Quality reviews
 
-#### Codex Review (codex:codex-rescue)
+#### Codex Review
 
 ```
 Review the recently changed blog posts in ~/blog/src/content/blogs/.
@@ -178,7 +177,7 @@ Check for:
 Output a quality score 1-10 per post and specific issues found.
 ```
 
-#### Gemini Review (gemini:gemini-consult)
+#### Gemini Review
 
 ```
 Review the blog content quality in ~/blog/src/content/blogs/.

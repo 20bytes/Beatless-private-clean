@@ -1,7 +1,7 @@
 ---
-description: "Multi-plugin review of experiment state. Codex reviews code correctness, Gemini reviews research direction, GSD verifies goal alignment. Produces continue/pivot/rollback/halt recommendation with evidence."
+description: "Multi-model review of experiment state. Codex reviews code correctness, Gemini reviews research direction, GSD verifies goal alignment. Produces continue/pivot/rollback/halt recommendation with evidence."
 argument-hint: "[--base <ref>] [--deep]"
-allowed-tools: Bash, Read, Write, Grep, Glob, Agent, Skill, mcp__plugin_gsd_gsd__*
+allowed-tools: Bash, Read, Write, Grep, Glob, Skill, mcp__plugin_gsd_gsd__*
 ---
 
 # Experiment Review
@@ -26,9 +26,9 @@ Summarize: rounds completed, current best metric, recent trajectory (improving /
 ## Step 2: Code Review (Codex)
 
 ```
-Agent tool:
-  subagent_type: "codex-cli"
-  prompt: "Review the current experiment diff in [project root].
+Use the current Codex executor:
+
+Review the current experiment diff in [project root].
 
 Check:
 1. Correctness — any bugs, off-by-one, dtype mismatches, gradient flow breaks?
@@ -37,17 +37,15 @@ Check:
 4. Constraint compliance — no edits to read-only files? No new dependencies?
 5. Reproducibility — is the change deterministic? Any uncontrolled randomness?
 
-Be specific: cite file, line, and what's wrong."
+Be specific: cite file, line, and what's wrong.
 ```
 
-**Fallback**: Claude reads the diff directly. Mark `[Claude-only review]`.
+**Fallback**: manual block with evidence if Codex is unavailable.
 
 ## Step 3: Direction Review (Gemini)
 
 ```
-Agent tool:
-  subagent_type: "gemini-cli"
-  prompt: "Research direction review for [project description].
+gemini -p "Research direction review for [project description].
 
 Current state:
 - Target metric: [from Task.md/program.md]
@@ -65,7 +63,7 @@ Questions:
 Be direct. 'Keep going' is only right if the evidence supports it."
 ```
 
-**Fallback**: Claude analyzes results history for trend. Mark `[UNVERIFIED]`.
+**Fallback**: Codex analyzes results history for trend. Mark `[UNVERIFIED]`.
 
 ## Step 4: Goal Verification (GSD)
 

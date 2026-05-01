@@ -1,7 +1,7 @@
 # OpenClaw × Beatless — Architecture Overview
 
 > **Last Updated**: 2026-04-09  
-> **Status**: V6 Complete, V7-V8 In Progress, GSD-2 Runtime Migration Planned  
+> **Status**: Historical overview. Current executor target is Codex-primary; see `docs/CODEX_PRIMARY_ARCHITECTURE.md`.
 > **Goal**: Autonomous AI agent society that maintains itself and delivers value with minimal human intervention
 
 ---

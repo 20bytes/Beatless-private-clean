@@ -1,6 +1,8 @@
 # OpenClaw → Hermes Agent: Complete Migration Status
 
 > Date: 2026-04-10 | All components audited and classified
+> Current note: this is a historical migration snapshot. The active executor
+> target is Codex-primary; see `docs/CODEX_PRIMARY_ARCHITECTURE.md`.
 
 ---
 

@@ -29,13 +29,14 @@ def _cmd(name: str) -> bool:
     return shutil.which(name) is not None
 
 
-def _run_quiet(args: list[str], timeout: int = 10) -> bool:
+def _run_quiet(args: list[str], timeout: int = 10, env: dict[str, str] | None = None) -> bool:
     try:
         result = subprocess.run(
             args,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             timeout=timeout,
+            env=env,
         )
         return result.returncode == 0
     except (OSError, subprocess.TimeoutExpired):
@@ -76,15 +77,71 @@ def main() -> int:
     core_checks = [
         ("python3", _cmd("python3"), "required for wake-gate scripts"),
         ("git", _cmd("git"), "required for repo workflows"),
-        ("claude", _cmd(CONFIG.claude_bin), f"Claude Code binary: {CONFIG.claude_bin}"),
+        ("codex", _cmd(CONFIG.codex_bin), f"primary executor: {CONFIG.codex_bin}"),
         ("uv", _cmd("uv"), "required by experiment commands"),
         ("node", _cmd("node"), "required by Hermes/shared JS helpers"),
+        ("claude", _cmd(CONFIG.claude_bin), "optional legacy fallback"),
         ("nvidia-smi", _cmd("nvidia-smi"), "required only for GPU experiment automation"),
     ]
+    blocking = {"python3", "git", "codex"}
+    if CONFIG.primary_executor != "codex":
+        blocking.add("claude")
     for name, passed, detail in core_checks:
-        _line("core", name, _fail(passed) if name in {"python3", "git", "claude"} else _ok(passed), detail)
-        if name in {"python3", "git", "claude"} and not passed:
+        _line("core", name, _fail(passed) if name in blocking else _ok(passed), detail)
+        if name in blocking and not passed:
             fail_count += 1
+
+    _line(
+        "core",
+        "primary executor",
+        _fail(CONFIG.primary_executor == "codex"),
+        CONFIG.primary_executor,
+    )
+    if CONFIG.primary_executor != "codex":
+        fail_count += 1
+    _line(
+        "core",
+        "codex model",
+        "INFO",
+        f"{CONFIG.codex_model}, reasoning={CONFIG.codex_reasoning_effort}, sandbox={CONFIG.codex_sandbox}",
+    )
+    _line("core", "codex home", "INFO", str(CONFIG.codex_home))
+    codex_env = os.environ.copy()
+    codex_env["CODEX_HOME"] = str(CONFIG.codex_home)
+    try:
+        CONFIG.codex_home.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        codex_ready = False
+    else:
+        codex_ready = _run_quiet(
+            [
+                CONFIG.codex_bin,
+                "-m",
+                CONFIG.codex_model,
+                "-c",
+                f'model_reasoning_effort="{CONFIG.codex_reasoning_effort}"',
+                "--ask-for-approval",
+                "never",
+                "--sandbox",
+                "read-only",
+                "exec",
+                "--ephemeral",
+                "-C",
+                str(CONFIG.repo_root),
+                "Reply exactly CODEX_READY",
+            ],
+            timeout=30,
+            env=codex_env,
+        )
+    _line("core", "codex ready", _fail(codex_ready), "non-destructive readiness check")
+    if not codex_ready:
+        fail_count += 1
+    _line(
+        "core",
+        "claude fallback",
+        "INFO",
+        "enabled" if CONFIG.allow_claude_fallback else "disabled",
+    )
 
     print()
     gh_installed = _cmd("gh")

@@ -1,4 +1,4 @@
-"""GitHub PR Pipeline — wake-gate + ClaudeCode execution.
+"""GitHub PR Pipeline — wake-gate + Codex execution.
 
 Discovers claimable issues, then runs a hard-fail preflight filter:
   - CONTRIBUTING.md AI policy     (reject repos that forbid AI contributions)
@@ -7,7 +7,8 @@ Discovers claimable issues, then runs a hard-fail preflight filter:
   - Scope sanity                  (skip broad epics / multi-feature work)
   - Duplicate work                (skip if an open PR already tackles the issue)
 
-Only issues that pass preflight are handed to ClaudeCode via /github-pr.
+Only issues that pass preflight are handed to Codex with the embedded
+github-pr pipeline spec.
 Working directory: ~/workspace (where repos are forked/cloned)
 """
 import subprocess
@@ -19,6 +20,7 @@ import sys
 from datetime import datetime, timezone
 
 from beatless_config import CONFIG
+from beatless_executor import executor_label, load_repo_text, run_primary
 
 WORKSPACE = str(CONFIG.workspace)
 CONTRIB_ROOT = str(CONFIG.contrib_root)
@@ -527,7 +529,8 @@ def preflight_filter(issues, scan_closed_history=True):
       6. Repository requires ask-first approval for significant/refactoring PRs
       7. Contributing.md exists check (info only — the skill will READ it)
 
-    Passing preflight means the issue is worth spending the claude -p session
+    Passing preflight means the issue is worth spending the Codex execution
+    session
     on; the session itself runs pr-direction-check for the nuanced verdict.
     """
     cache = load_policy_cache()
@@ -630,7 +633,7 @@ def parse_args():
     ap.add_argument(
         "--dry-run",
         action="store_true",
-        help="discover and preflight candidate issues without invoking ClaudeCode",
+        help="discover and preflight candidate issues without invoking Codex",
     )
     ap.add_argument(
         "--issue-limit",
@@ -824,8 +827,21 @@ def main():
 
     direction_blob_json = json.dumps(issue_blobs, ensure_ascii=False, indent=2)
 
+    pipeline_spec = load_repo_text("pipelines/github-pr.md")
+    direction_skill = load_repo_text("skills/pr-direction-check/SKILL.md", max_chars=40_000)
+
     prompt = (
-        f"/github-pr\n\n"
+        f"You are the Beatless primary executor. Execute this run with Codex directly.\n"
+        f"Do not invoke Claude Code, Claude slash commands, or Claude Agent subagents.\n"
+        f"Ignore any legacy bridge wording in the embedded specs and perform\n"
+        f"implementation/review work directly in this Codex session.\n"
+        f"When it mentions Gemini, use the local `gemini` CLI if available; otherwise\n"
+        f"continue with Codex-only reasoning and record the fallback.\n\n"
+        f"Primary executor: {executor_label()}\n\n"
+        f"EMBEDDED PIPELINE SPEC — pipelines/github-pr.md:\n"
+        f"```markdown\n{pipeline_spec}\n```\n\n"
+        f"EMBEDDED DIRECTION CHECK SPEC — skills/pr-direction-check/SKILL.md:\n"
+        f"```markdown\n{direction_skill}\n```\n\n"
         f"Candidate issues (preflight-approved — block-label + duplicate-PR gates passed):\n\n"
         f"{issue_list}\n\n"
         f"DIRECTION-CHECK INPUT (judgment data — consume via pr-direction-check skill):\n"
@@ -837,8 +853,9 @@ def main():
         f"- Required files: task_plan.md, findings.md, progress.md\n"
         f"- PR report: {PR_STAGE_ROOT}/<repo-name>/pr-report.md\n\n"
         f"MANDATORY FIRST STEP — Phase 2.5 direction check:\n"
-        f"For each candidate, invoke Skill(\"pr-direction-check\") with the matching\n"
-        f"blob above. The skill returns DIRECTION_VERDICT: <status> | <reason>.\n"
+        f"For each candidate, apply the embedded pr-direction-check spec to the\n"
+        f"matching blob above. Emit a DIRECTION_VERDICT: <status> | <reason> line\n"
+        f"for each candidate in your internal report before cloning or coding.\n"
         f"- proceed → continue to clone + code\n"
         f"- block:maintainer-discussion-required → emit PIPELINE_RESULT: issue-skipped | <reason>, skip this candidate\n"
         f"- block:* → emit PIPELINE_RESULT with the matching status, skip this candidate\n"
@@ -855,7 +872,8 @@ def main():
         f"- No internal tooling references (agent names, orchestration, 'my analysis shows').\n"
         f"- Match the project's language. AI disclosure per PullRequest.md §AI Disclosure.\n"
         f"- No status tables, no bolded usernames, no emoji-headed sections.\n\n"
-        f"Use codex:codex-rescue for implementation; gemini:gemini-consult for architecture.\n"
+        f"Use Codex directly for implementation and review. Use `gemini` CLI for\n"
+        f"large architecture checks only when it is available and useful.\n"
         f"Pick the most suitable proceed-verdict candidate and execute the full pipeline.\n\n"
         f"IMPORTANT: At the end, print in this exact format:\n"
         f"PIPELINE_RESULT: <status> | <pr_url_or_reason>\n"
@@ -864,15 +882,7 @@ def main():
         f"repo-forbids-ai, cla-blocked, duplicate, maintainer-disputed, error"
     )
 
-    result = subprocess.run(
-        [CONFIG.claude_bin, "-p", "--model", CONFIG.claude_model,
-         "--dangerously-skip-permissions",
-         "--max-budget-usd", CONFIG.claude_max_budget_usd,
-         prompt],
-        capture_output=True, text=True,
-        timeout=7200,
-        cwd=WORKSPACE
-    )
+    result = run_primary(prompt, cwd=WORKSPACE, mode="workspace-write", timeout=7200)
 
     stdout = result.stdout.strip()
     stderr = result.stderr.strip()
@@ -880,12 +890,12 @@ def main():
     if result.returncode != 0:
         detail = stderr[:500] if stderr else "unknown error"
         write_status("error", f"exit {result.returncode}: {detail}")
-        print(f"PIPELINE_ERROR: ClaudeCode exited {result.returncode}\n{detail}")
+        print(f"PIPELINE_ERROR: Codex exited {result.returncode}\n{detail}")
         return
 
     if not stdout:
         write_status("empty-output", f"exit 0 but no stdout. stderr: {stderr[:200]}")
-        print(f"PIPELINE_ERROR: ClaudeCode exited 0 but produced no output.")
+        print(f"PIPELINE_ERROR: Codex exited 0 but produced no output.")
         if stderr:
             print(f"stderr: {stderr[:1000]}")
         print(f"\nCandidate issues were:\n{issue_list}")

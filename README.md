@@ -2,7 +2,7 @@
 
 Autonomous agent orchestration for open-source contribution, technical writing, and ML research.
 
-Beatless is a hybrid control plane: a lightweight scheduler watches for useful work, then routes deep execution to Claude Code, Codex, Gemini, GitHub, Zotero, and local experiment workspaces.
+Beatless is a hybrid control plane: a lightweight scheduler watches for useful work, then routes deep execution to Codex, Gemini, GitHub, Zotero, and local experiment workspaces.
 
 ![Beatless framework](docs/assets/framework.png)
 
@@ -15,25 +15,27 @@ Beatless is a hybrid control plane: a lightweight scheduler watches for useful w
 | Research automation | Resume or halt experiment workspaces based on recorded state. |
 | Paper workflow | Harvest papers, deduplicate against Zotero, and sync metadata into notes. |
 | Dashboard | Show agents, pipelines, experiment status, GPU state, and recent activity. |
-| CLI bridges | Route Claude Code agents through local Codex and Gemini CLIs. |
+| CLI bridges | Route execution through local Codex and Gemini CLIs. |
 
 ## Architecture
 
 Beatless separates scheduling from execution.
 
 - Hermes handles cron, wake gates, lightweight status checks, and routing.
-- Claude Code handles long-running reasoning and command execution.
-- Codex focuses on code edits, feasibility checks, and review.
+- Codex is the primary long-running executor for reasoning, code edits, command execution, feasibility checks, and review.
 - Gemini focuses on literature grounding, large-context review, and critique.
+- Claude Code remains an optional legacy/manual fallback, not the default wake-gate executor.
 - Zotero and Obsidian hold research inputs and reading outputs.
 - The dashboard reads JSON state from local collectors and renders it through a decoupled frontend.
+
+See `docs/CODEX_PRIMARY_ARCHITECTURE.md` for the current executor split.
 
 ## Repository Layout
 
 | Module | Description |
 | --- | --- |
 | `commands/exp` | Slash commands for experiment status, init, discovery, run, and review. |
-| `commands/agents` | Claude Code agent wrappers for Codex CLI and Gemini CLI. |
+| `commands/agents` | Legacy bridge definitions for Codex CLI and Gemini CLI. |
 | `hermes-scripts` | Wake-gate scripts for GitHub, Zotero, research, blog, and preflight checks. |
 | `dashboard` | FastAPI backend, SSE stream, and Vite frontend. |
 | `pipelines` | Pipeline behavior specs and operating rules. |
@@ -117,10 +119,9 @@ Use `.env.example` as the public template and keep provider keys, Zotero IDs, Gi
 - Python with `uv`
 - Node.js and npm
 - GitHub CLI (`gh`)
-- Claude Code CLI (`claude`)
 - Codex CLI (`codex`)
 - Gemini CLI (`gemini`)
-- Optional: Hermes Agent, Zotero API access, NVIDIA tooling for GPU experiments
+- Optional: Claude Code CLI (`claude`) for manual legacy fallback, Hermes Agent, Zotero API access, NVIDIA tooling for GPU experiments
 
 ## License
 

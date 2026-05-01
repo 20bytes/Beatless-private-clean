@@ -22,8 +22,8 @@ RESEARCH_DIR = HOME / "research"
 AGENTS = [
     {"id": "lacia", "name": "Lacia", "role": "strategy", "model": "Kimi K2.6", "color": "#facc15"},
     {"id": "methode", "name": "Methode", "role": "execute", "model": "Step 3.5 Flash", "color": "#22d3ee"},
-    {"id": "satonus", "name": "Satonus", "role": "review", "model": "Claude Code", "color": "#f87171"},
-    {"id": "snowdrop", "name": "Snowdrop", "role": "research", "model": "Claude Code", "color": "#c084fc"},
+    {"id": "satonus", "name": "Satonus", "role": "review", "model": "Codex CLI", "color": "#f87171"},
+    {"id": "snowdrop", "name": "Snowdrop", "role": "research", "model": "Codex + Gemini", "color": "#c084fc"},
     {"id": "kouka", "name": "Kouka", "role": "deliver", "model": "MiniMax M2.7", "color": "#fbbf24"},
     {"id": "aoi", "name": "Aoi", "role": "dispatch", "model": "Control Plane", "color": "#60a5fa"},
 ]

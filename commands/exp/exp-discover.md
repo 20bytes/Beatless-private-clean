@@ -1,7 +1,7 @@
 ---
 description: "Generate research hypotheses using two-path methodology. Path 1 (idea-first): domain exploration, bottleneck analysis, method selection based on problem+dataset characteristics. Path 2 (application-first): cross-domain transfer, shared first principles, hidden assumption mining. Multi-agent parallel analysis, 2025+ literature focus."
 argument-hint: "[topic or focus area] [--path idea|application] [--dimensions N]"
-allowed-tools: Read, Write, Grep, Glob, Bash, Agent, Skill, mcp__plugin_gsd_gsd__*
+allowed-tools: Read, Write, Grep, Glob, Bash, Skill, mcp__plugin_gsd_gsd__*
 ---
 
 # Experiment Discover: Two-Path Hypothesis Generator
@@ -177,9 +177,7 @@ Each hypothesis must state:
 Invoke Gemini for 2025+ literature search:
 
 ```
-Agent tool:
-  subagent_type: "gemini-cli"
-  prompt: "Search academic literature (2025 papers strongly preferred, 2024 acceptable) for: [top 3-4 hypotheses from Step 3].
+gemini -p "Search academic literature (2025 papers strongly preferred, 2024 acceptable) for: [top 3-4 hypotheses from Step 3].
 
 For each hypothesis:
 1. 3-5 closest published papers (title, venue, year, one-line takeaway)
@@ -194,9 +192,7 @@ Focus on: [target domain from Task.md/program.md]. Return structured, with citat
 
 Also invoke Gemini as devil's advocate:
 ```
-Agent tool:
-  subagent_type: "gemini-cli"
-  prompt: "Play devil's advocate against the top hypothesis: [describe it].
+gemini -p "Play devil's advocate against the top hypothesis: [describe it].
 Attack with: (1) simpler explanation that achieves similar results, (2) prior work that already solved this, (3) fundamental flaw that prevents generalization."
 ```
 
@@ -209,9 +205,9 @@ Paste Gemini results verbatim into `findings.md` under `## Literature — <date>
 Invoke Codex for implementation feasibility:
 
 ```
-Agent tool:
-  subagent_type: "codex-cli"
-  prompt: "Assess feasibility of these hypotheses against the current codebase at [project root]:
+Use the current Codex executor:
+
+Assess feasibility of these hypotheses against the current codebase at [project root]:
 
 [top 3 hypotheses with one-line descriptions]
 
@@ -223,10 +219,10 @@ For each, check:
 5. Expected gain magnitude vs implementation cost
 6. Any dependency or API changes needed (should be NONE)
 
-Be brutally honest. A beautiful idea that needs 500 lines of new code and a new library is worse than an ugly idea that needs 5 lines."
+Be brutally honest. A beautiful idea that needs 500 lines of new code and a new library is worse than an ugly idea that needs 5 lines.
 ```
 
-**Fallback** if Codex unavailable: Claude reads the codebase directly and estimates. Mark `[UNVERIFIED — Claude-only assessment]`.
+**Fallback** if Codex unavailable: block and mark `[UNVERIFIED — Codex unavailable]`.
 
 ---
 

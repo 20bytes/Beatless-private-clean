@@ -1,4 +1,4 @@
-"""GitHub Response — wake-gate + ClaudeCode execution.
+"""GitHub Response — wake-gate + Codex execution.
 
 Wakes the PR-follow-up pipeline when ANY of:
   1. A maintainer posted a new non-author comment since the last visit.
@@ -18,6 +18,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from beatless_config import CONFIG
+from beatless_executor import executor_label, load_repo_text, run_primary
 
 AUTHOR = CONFIG.github_author
 MARKER = str(CONFIG.shared_file(".last-github-response"))
@@ -275,7 +276,7 @@ def parse_args():
     ap.add_argument(
         "--dry-run",
         action="store_true",
-        help="inspect open PRs and write status without invoking ClaudeCode",
+        help="inspect open PRs and write status without invoking Codex",
     )
     return ap.parse_args()
 
@@ -370,8 +371,18 @@ def main():
         }, indent=2))
         return
 
+    followup_spec = load_repo_text("pipelines/pr-followup.md")
+
     prompt = (
-        f"/pr-followup\n\n"
+        f"You are the Beatless primary executor. Execute this PR follow-up run\n"
+        f"with Codex directly. Do not invoke Claude Code, Claude slash commands,\n"
+        f"or Claude Agent subagents. Ignore any legacy bridge wording in the\n"
+        f"embedded spec and perform implementation/review work yourself in this\n"
+        f"Codex session. When it mentions Gemini, use the\n"
+        f"local `gemini` CLI if available; otherwise record a Codex-only fallback.\n\n"
+        f"Primary executor: {executor_label()}\n\n"
+        f"EMBEDDED PIPELINE SPEC — pipelines/pr-followup.md:\n"
+        f"```markdown\n{followup_spec}\n```\n\n"
         f"Actionable PRs (include reason + CI state):\n\n"
         f"{pr_list}\n\n"
         f"Routing anchors (must follow exactly):\n"
@@ -398,21 +409,14 @@ def main():
         f"1. gh pr view <owner/repo> <number> --comments\n"
         f"2. If CI failing: fix first, push, THEN reply with 'pushed a fix, thanks for flagging'.\n"
         f"3. If actionable feedback: implement, push, reply plainly.\n"
-        f"4. Use codex:codex-rescue for requested-change implementation.\n"
-        f"5. Use gemini:gemini-consult for larger architecture checks; if startup is slow, retry once.\n"
+        f"4. Use Codex directly for requested-change implementation.\n"
+        f"5. Use `gemini` CLI for larger architecture checks if available; if not, record a Codex-only fallback.\n"
         f"6. If question: answer with evidence from code.\n"
         f"7. If approved: thank and confirm merge readiness.\n"
         f"8. If CLA required: sign if possible, else note it plainly and stop on that PR.\n"
     )
 
-    result = subprocess.run(
-        [CONFIG.claude_bin, "-p", "--model", CONFIG.claude_model,
-         "--dangerously-skip-permissions",
-         prompt],
-        capture_output=True, text=True,
-        timeout=3600,
-        cwd=WORKSPACE
-    )
+    result = run_primary(prompt, cwd=WORKSPACE, mode="workspace-write", timeout=3600)
 
     if result.returncode == 0:
         open(MARKER, "w").close()
@@ -421,7 +425,7 @@ def main():
     if output:
         print(output[-4000:] if len(output) > 4000 else output)
     else:
-        print(f"ClaudeCode exited {result.returncode}: {result.stderr[:500]}")
+        print(f"Codex exited {result.returncode}: {result.stderr[:500]}")
 
 
 if __name__ == "__main__":

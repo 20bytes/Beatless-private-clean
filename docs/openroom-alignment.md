@@ -1,5 +1,7 @@
 # OpenRoom × Hermes v2.1 Alignment Plan
 
+> Historical draft. This document targets the pre-Codex-primary v2 mailbox/OpenRoom plan. Current execution policy lives in `docs/CODEX_PRIMARY_ARCHITECTURE.md` and `docs/HERMES.md`.
+
 > Date: 2026-04-11 | Status: DRAFT | Depends on: architecture-v2-simplification-v2.md
 
 ---

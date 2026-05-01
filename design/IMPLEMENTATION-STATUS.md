@@ -1,7 +1,7 @@
 # Constellation v3 — Implementation Status
 
 > Date: 2026-04-22
-> Status: Phase 1 Complete, Phase 3 In Progress (ClaudeCode Integration Testing)
+> Status: Superseded by Codex-primary execution cutover. See `docs/CODEX_PRIMARY_ARCHITECTURE.md`.
 
 ## What's Been Done
 
@@ -27,7 +27,7 @@ delegation:                     # Subagents use Step for fast execution
   max_spawn_depth: 2
 
 cron:
-  script_timeout_seconds: 7200  # 2h for long ClaudeCode jobs
+  script_timeout_seconds: 7200  # 2h for long Codex jobs
 
 model_aliases:                  # Quick model switching
   step:    { model: "step-3.5-flash", provider: step }
@@ -60,19 +60,19 @@ model_aliases:                  # Quick model switching
 
 | Job | Schedule | Script (wake-gate) | Execution |
 |-----|----------|---------------------|-----------|
-| GitHub Response | every 60m | `github-response.py` — checks open PRs with new activity | Script calls `claude -p /pr-followup` directly (Sonnet 4.6, bypass perms) |
-| GitHub PR Pipeline | every 150m | `github-pr.py` — checks claimable issues | Script calls `claude -p /github-pr` directly (Sonnet 4.6, $5 budget cap) |
-| Auto Research | every 240m | `auto-research.py` — checks `~/research/**/outputs/` | Script calls `claude -p /analyze-results` directly (Sonnet 4.6) |
-| Blog Maintenance | every 720m | `blog-maintenance.py` — checks blog dir exists | Hermes native (Kimi orchestrates, MiniMax writes) |
+| GitHub Response | every 60m | `github-response.py` — checks open PRs with new activity | Script calls Codex with embedded `pipelines/pr-followup.md` |
+| GitHub PR Pipeline | every 150m | `github-pr.py` — checks claimable issues | Script calls Codex with embedded `pipelines/github-pr.md` and direction-check spec |
+| Auto Research | every 240m | `auto-research.py` — checks `~/research/**/outputs/` | Script calls Codex with embedded `commands/exp/exp-run.md` |
+| Blog Maintenance | every 720m | `blog-maintenance.py` — audits blog dir | Audit-only; no heavy executor |
 
-**How cron works** (ClaudeCode-routed jobs):
+**How cron works** (Codex-routed jobs):
 1. Gateway ticks every 60s, checks for due jobs
 2. Wake-gate script runs (up to 7200s timeout via `cron.script_timeout_seconds`)
 3. Script checks if work exists (< 30s)
 4. If no work: prints `{"wakeAgent": false}` → job skipped, zero cost
-5. If work found: script calls `claude -p --model sonnet --dangerously-skip-permissions "/command ..."` directly
-6. ClaudeCode runs autonomously (30min–2h), output captured by script
-7. Script prints ClaudeCode's output → Hermes agent wakes to summarize/remember
+5. If work found: script calls `codex exec` through `hermes-scripts/beatless_executor.py`
+6. Codex runs autonomously (30min–2h), output captured by script
+7. Script prints Codex output → Hermes agent wakes to summarize/remember
 8. Hermes agent (Kimi, ~3 turns) saves key outcomes to MEMORY.md
 
 **Key directories**:
@@ -86,15 +86,15 @@ Location: `~/.hermes/scripts/`
 All scripts follow the same pattern:
 - Quick check if work exists (< 30s)
 - If no work: `{"wakeAgent": false}` → zero token cost
-- If work found: call `claude -p` directly with `--dangerously-skip-permissions`
+- If work found: call Codex through `beatless_executor.run_codex_exec`
 - Capture output, print for Hermes delivery
 
-| Script | Check Logic | ClaudeCode Command | CWD |
+| Script | Check Logic | Codex Embedded Spec | CWD |
 |--------|-------------|-------------------|-----|
-| `github-response.py` | `gh search prs --author=<your-github-user>` + activity marker | `/pr-followup` | `~/workspace` |
-| `github-pr.py` | `gh search issues --label=good first issue,help wanted,bug` | `/github-pr` | `~/workspace` |
-| `auto-research.py` | Glob `~/research/**/outputs/*/` + freshness marker | `/analyze-results` | experiment dir |
-| `blog-maintenance.py` | Check `~/claw/blog/` exists | (none — Hermes native) | — |
+| `github-response.py` | `gh search prs --author=<your-github-user>` + activity marker | `pipelines/pr-followup.md` | `~/workspace` |
+| `github-pr.py` | `gh search issues --label=good first issue,help wanted,bug` | `pipelines/github-pr.md` | `~/workspace` |
+| `auto-research.py` | Glob `~/research/**/outputs/*/` + freshness marker | `commands/exp/exp-run.md` | experiment dir |
+| `blog-maintenance.py` | Check `~/claw/blog/` exists | none; audit-only | — |
 
 ---
 
@@ -122,25 +122,25 @@ All scripts follow the same pattern:
 │     true↓        true↓          true↓             ↓         │
 │       ▼              ▼              ▼              ▼         │
 │  ┌───────────────────────────────┐ ┌──────────────────────┐ │
-│  │  SCRIPT calls claude -p       │ │  KIMI K2.6 (Lacia)   │ │
-│  │  --model sonnet               │ │  Hermes AIAgent      │ │
-│  │  --dangerously-skip-perms     │ │                      │ │
+│  │  SCRIPT calls codex exec      │ │  KIMI K2.6 (Lacia)   │ │
+│  │  gpt-5.5 / xhigh              │ │  Hermes AIAgent      │ │
+│  │  workspace-write sandbox      │ │                      │ │
 │  │  cwd: ~/workspace             │ │  delegate(Step)→     │ │
 │  │  or experiment dir             │ │   web search topics  │ │
 │  │                               │ │  delegate(MiniMax)→  │ │
-│  │  /pr-followup                 │ │   write blog post    │ │
-│  │  /github-pr                   │ │  terminal()→         │ │
-│  │  /analyze-results             │ │   pnpm build         │ │
+│  │  pr-followup spec             │ │   write blog post    │ │
+│  │  github-pr spec               │ │  terminal()→         │ │
+│  │  exp-run spec                 │ │   pnpm build         │ │
 │  │                               │ │   git commit+push    │ │
 │  │  ┌─────────────────────────┐  │ │                      │ │
-│  │  │ CLAUDE CODE (Sonnet)    │  │ └──────────────────────┘ │
-│  │  │ Full ecosystem:         │  │        Hermes Native     │
-│  │  │ Codex, Gemini, GSD,    │  │                           │
-│  │  │ MCP, Agent Teams       │  │                           │
+│  │  │ CODEX CLI              │  │ └──────────────────────┘ │
+│  │  │ Primary executor:      │  │        Hermes Native     │
+│  │  │ code, review, PRs,    │  │                           │
+│  │  │ experiments            │  │                           │
 │  │  │ Runs 30min-2h          │  │                           │
 │  │  └─────────────────────────┘  │                           │
 │  └───────────────────────────────┘                           │
-│        Script → ClaudeCode direct                            │
+│        Script → Codex direct                                 │
 │        (no Hermes agent middleman)                           │
 │                                                              │
 │  After script completes:                                     │
@@ -160,7 +160,7 @@ All scripts follow the same pattern:
 
 4. **Delegation provider**: `custom` not supported for delegation. Changed to named provider `"step"` which resolves through the `providers:` dict.
 
-5. **`.env` symlink**: Broke symlink from `~/.hermes/.env → ~/claw/.env` because the shared `.env` has `KIMI_BASE_URL` with `/v1` suffix used by other tools (ClaudeCode). Hermes needs it without `/v1`.
+5. **`.env` symlink**: Broke symlink from `~/.hermes/.env → ~/claw/.env` because the shared `.env` has provider settings used by other tools. Hermes needs its own provider-specific base URL handling.
 
 ---
 
@@ -188,7 +188,7 @@ All scripts follow the same pattern:
 - [ ] Test blog job end-to-end with MiniMax writing + image gen
 - [ ] Create `stock-review` skill (future)
 
-### Phase 3: ClaudeCode Integration
+### Phase 3: Codex Integration
 - [x] GitHub Response pipeline — verified end-to-end (2026-04-22)
 - [x] Auto Research wake-gate — verified logic correct (2026-04-22)
 - [x] GitHub PR pipeline — verified end-to-end, PR#12 submitted (2026-04-22)

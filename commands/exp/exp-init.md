@@ -1,7 +1,7 @@
 ---
 description: Initialize experiment workspace. Auto-detects mode from Task.md (full — dual-GPU, long budget) or program.md (quick — single-GPU, short budget). Creates branch, planning files, baseline run, results tracking.
 argument-hint: "[Task.md path or run-tag] [--skip-baseline]"
-allowed-tools: Bash, Read, Write, Glob, Grep, Agent, Skill, mcp__plugin_gsd_gsd__*
+allowed-tools: Bash, Read, Write, Glob, Grep, Skill, mcp__plugin_gsd_gsd__*
 ---
 
 # Experiment Init
@@ -22,7 +22,7 @@ Initialize a clean, reproducible experiment workspace.
 Read all available context files:
 - `README.md`, `program.md` (project description)
 - `Task.md` (full mode: objective, baseline, SOTA target, constraints, budget)
-- `CLAUDE.md` (project-specific Claude instructions)
+- `AGENTS.md`, `CODEX.md`, or `CLAUDE.md` (project-specific agent instructions, if present)
 - Previous round artifacts if resuming: `progress.md`, `findings.md`, `results.tsv`
 
 **Resume detection**: If `progress.md` exists with completed rounds, this is a resume. Summarize prior state in ≤10 bullets. Do NOT re-run baseline. Proceed to output with resume instructions.

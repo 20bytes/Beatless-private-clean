@@ -104,6 +104,14 @@ class BeatlessConfig:
     claude_bin: str
     claude_model: str
     claude_max_budget_usd: str
+    primary_executor: str
+    codex_bin: str
+    codex_home: Path
+    codex_model: str
+    codex_reasoning_effort: str
+    codex_sandbox: str
+    codex_timeout_seconds: int
+    allow_claude_fallback: bool
     github_pr_quality_threshold: float
     stale_blog_days: int
     user_agent_contact: str
@@ -156,6 +164,9 @@ def _build_config() -> BeatlessConfig:
     except ValueError:
         quality_threshold = 7.0
 
+    primary_executor = _env("BEATLESS_PRIMARY_EXECUTOR", default="codex").lower()
+    allow_claude_fallback_raw = _env("BEATLESS_ALLOW_CLAUDE_FALLBACK", default="1").lower()
+
     return BeatlessConfig(
         repo_root=repo,
         home=home,
@@ -185,6 +196,14 @@ def _build_config() -> BeatlessConfig:
         claude_bin=_env("CLAUDE_BIN", default="claude"),
         claude_model=_env("BEATLESS_CLAUDE_MODEL", default="sonnet"),
         claude_max_budget_usd=_env("BEATLESS_CLAUDE_MAX_BUDGET_USD", default="5.00"),
+        primary_executor=primary_executor,
+        codex_bin=_env("CODEX_BIN", default="codex"),
+        codex_home=_path("BEATLESS_CODEX_HOME", "CODEX_HOME", default="~/.codex"),
+        codex_model=_env("BEATLESS_CODEX_MODEL", default="gpt-5.5"),
+        codex_reasoning_effort=_env("BEATLESS_CODEX_REASONING_EFFORT", default="xhigh"),
+        codex_sandbox=_env("BEATLESS_CODEX_SANDBOX", default="workspace-write"),
+        codex_timeout_seconds=_int("CODEX_TIMEOUT_SECONDS", default=7200),
+        allow_claude_fallback=allow_claude_fallback_raw not in {"0", "false", "no"},
         github_pr_quality_threshold=quality_threshold,
         stale_blog_days=_int("BEATLESS_STALE_BLOG_DAYS", default=60),
         user_agent_contact=contact,

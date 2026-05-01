@@ -33,16 +33,20 @@ Also consult `~/claw/pua/skills/pua-en/SKILL.md` for **internal debugging method
   - `~/workspace/pr-stage/<repo-name>/progress.md`
 - **Pipeline report**: `~/workspace/pr-stage/<repo-name>/pr-report.md`
 
-## Plugin Policy (optional accelerators, not hard dependencies)
+## Executor Policy
 
-Plugins may be unavailable in `-p` mode or fail to initialize. Every phase MUST work with Claude + Bash alone. Plugins add speed/depth when available.
+This pipeline is now executed by Codex directly. Do not assume Claude Code
+slash commands, Claude Agent subagents, or any legacy Codex bridge are
+available.
+Every phase must work with Codex + Bash alone. Gemini is an optional
+second-opinion CLI for large-context architecture or literature grounding.
 
-| Plugin | Best at | Invoke via | Fallback |
+| Tool | Best at | Invoke via | Fallback |
 |--------|---------|------------|----------|
-| Codex (`codex:codex-rescue`) | Contained code fixes, sandbox testing | Agent tool, subagent_type `codex:codex-rescue` | Claude edits files + runs tests via Bash |
-| Gemini (`gemini:gemini-consult`) | Large codebase reading (1M context), architecture review | Agent tool, subagent_type `gemini:gemini-consult` | Claude reads key files + grep for patterns |
+| Codex | Code edits, review, feasibility, command execution | current Codex session / `codex exec` | manual block with evidence |
+| Gemini | Large-codebase reading, architecture review | `gemini -p "<question>"` | Codex-only grep + source reading |
 
-**Try once, fallback immediately.** Do not retry plugins more than once per phase. If unavailable, proceed with Claude-only and note it in the report.
+**Try Gemini once, fallback immediately.** Do not retry optional tools more than once per phase. If unavailable, proceed Codex-only and note it in the report.
 
 ## Quality Standards (loaded as skills)
 
@@ -107,10 +111,11 @@ On fail: `PIPELINE_RESULT: duplicate | <url-of-existing-pr-or-claim>`.
 
 ### 2d. Contribution Direction Sanity (JUDGMENT via skill)
 
-**Do NOT try to decide this with grep.** Invoke:
+**Do NOT try to decide this with grep.** Apply the repository-local
+`skills/pr-direction-check/SKILL.md` rubric to the pre-fetched JSON blob:
 
 ```
-Skill("pr-direction-check")
+pr-direction-check
 ```
 
 Pass the pre-fetched JSON blob (issue body, labels, last 20 comments with
@@ -215,19 +220,13 @@ Analyze the failure, identify root cause, plan the fix.
 
 ### 6a. Gemini for large-codebase reads (when needed)
 
-Two equivalent invocation paths — use whichever is live. Prefer Bash when running in `claude -p` cron context; prefer Agent tool when running interactively.
+Use the standalone Gemini CLI when it is live.
 
-**Path A — Bash CLI (always available; headless):**
 ```bash
 gemini -p "Trace <function> call chain in <repo-path>. Identify the <n> most likely callers affected by <proposed change>. Output: file:line refs + a one-line risk assessment per caller." --model gemini-2.5-pro
 ```
 
-**Path B — Agent tool (plugin route; same CLI under the hood):**
-```
-Agent(subagent_type="gemini:gemini-consult", prompt="Trace <function> call chain in <repo> ... ")
-```
-
-Fallback if both unavailable: `grep -rn` + reading key files manually.
+Fallback if unavailable: `grep -rn` + reading key files manually.
 
 ### 6b. Stuck > 2 iterations? Escalate to GSD debug
 
@@ -249,24 +248,11 @@ Make the fix. Keep changes minimal and atomic.
 - If DCO was flagged in 2b, use `git commit -s` for every commit.
 - **Commit hygiene** per `GitHub PR 贡献指南.md` §Commit Hygiene: each commit compiles, is bisect-friendly, has descriptive message. Squash WIP commits via `git rebase -i` before push.
 
-### 7a. Codex for contained fixes
+### 7a. Codex implementation
 
-For self-contained bug fixes (< 100 LOC, single module), delegate to Codex.
-
-**Path A — Bash CLI (always available; headless):**
-```bash
-codex exec "<exact-repro-steps>
-Fix in <file>:<line-range>. Tests live in <test-path>.
-Run the specific failing test after edit; paste passing output.
-Apply the fix via git apply when done."
-```
-
-**Path B — Agent tool (plugin route; same CLI under the hood):**
-```
-Agent(subagent_type="codex:codex-rescue", prompt="<same prompt as above>")
-```
-
-Fallback if both unavailable: Claude edits via Edit tool + verifies via Bash.
+You are already running inside the Codex executor. Make the contained fix
+directly, then run the specific failing test and paste the passing output into
+`findings.md`. Do not spawn Claude Agent subagents.
 
 ## Phase 8: VERIFY (invoke verification gate)
 
@@ -315,9 +301,9 @@ Reviews the source files changed during this phase for bugs, security issues, an
 
 Invoke skill **`pr-quality-gate`** and score all 8 dimensions. In `-p` mode (automated), run three independent review passes:
 
-1. **Pass 1 — Correctness** (Claude): Does the fix address the root cause? Are tests adequate? Any regressions?
-2. **Pass 2 — Architecture** (Gemini subagent if available, else Claude second pass): Does the fix fit the codebase patterns? Any design concerns?
-3. **Pass 3 — Quality Gate** (Codex subagent if available, else Claude third pass): Score each of the 8 dimensions per the rubric.
+1. **Pass 1 — Correctness** (Codex): Does the fix address the root cause? Are tests adequate? Any regressions?
+2. **Pass 2 — Architecture** (Gemini CLI if available, else Codex second pass): Does the fix fit the codebase patterns? Any design concerns?
+3. **Pass 3 — Quality Gate** (Codex): Score each of the 8 dimensions per the rubric.
 
 **Aggregation**: mean of 3 passes. Min 7.0/10. Hard fail if Direction or Compliance < 5 from any pass.
 
@@ -378,7 +364,7 @@ Write `~/workspace/pr-stage/<repo-name>/pr-report.md`:
 - Review scores: [pass1, pass2, pass3] → average
 - Tests: [pass/fail count]
 - Diff size: [LOC class]
-- Plugins used: [list or "Claude-only"]
+- Optional tools used: [list or "Codex-only"]
 - Status: [submitted / needs-work / blocked]
 ```
 

@@ -1,10 +1,10 @@
-"""Auto Research — wake-gate + ClaudeCode execution.
+"""Auto Research — wake-gate + Codex execution.
 
 Scans ~/research for experiment workspaces (detected by program.md or Task.md)
 that have in-progress state (progress.md with unfinished rounds, OR new
 outputs/ since last visit).
 
-When work is detected, runs ClaudeCode with /exp-run resume — the current
+When work is detected, runs Codex with the embedded /exp-run resume spec — the current
 autonomous experiment loop (combined rewrite of the deprecated /autoresearch
 + /research-analyze pair). /exp-run auto-detects quick vs full mode from the
 workspace and continues from the last round.
@@ -13,12 +13,12 @@ Working directory: ~/research/<workspace>
 """
 import json
 import os
-import subprocess
 import argparse
 from pathlib import Path
 from datetime import datetime, timezone
 
 from beatless_config import CONFIG
+from beatless_executor import executor_label, load_repo_text, run_primary
 
 MARKER = str(CONFIG.shared_file(".last-research-analysis"))
 STATUS_FILE = str(CONFIG.shared_file(".last-auto-research-status"))
@@ -80,7 +80,7 @@ def parse_args():
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="detect actionable research workspaces without invoking Claude",
+        help="detect actionable research workspaces without invoking Codex",
     )
     parser.add_argument(
         "--research-dir",
@@ -91,7 +91,7 @@ def parse_args():
         "--timeout-seconds",
         type=int,
         default=7200,
-        help="maximum seconds to wait for the Claude execution path (default: 7200)",
+        help="maximum seconds to wait for the Codex execution path (default: 7200)",
     )
     return parser.parse_args()
 
@@ -137,7 +137,7 @@ def main():
                 {"workspace": workspace, "trigger": trigger}
                 for workspace, trigger in workspaces
             ],
-            "note": "dry-run only; Claude was not invoked",
+            "note": "dry-run only; Codex was not invoked",
         }
         write_status(status)
         print(json.dumps({
@@ -149,8 +149,20 @@ def main():
         }, ensure_ascii=False))
         return
 
+    exp_run_spec = load_repo_text("commands/exp/exp-run.md")
+
     prompt = (
-        f"/exp-run resume\n\n"
+        f"You are the Beatless primary executor. Execute this experiment resume\n"
+        f"run with Codex directly. Do not invoke Claude Code, Claude slash commands,\n"
+        f"or Claude Agent subagents. When the embedded spec mentions legacy bridges\n"
+        f"such as `codex-cli`, perform that code work yourself in this Codex\n"
+        f"session. When it\n"
+        f"mentions `gemini-cli`, use the local `gemini` CLI if available; otherwise\n"
+        f"continue with Codex-only reasoning and record the fallback.\n\n"
+        f"Primary executor: {executor_label()}\n\n"
+        f"EMBEDDED EXPERIMENT SPEC — commands/exp/exp-run.md:\n"
+        f"```markdown\n{exp_run_spec}\n```\n\n"
+        f"Command intent: /exp-run resume\n\n"
         f"Wake-gate selected workspace: {cwd}\n"
         f"Trigger reason: {reason}\n\n"
         f"Per /exp-run spec:\n"
@@ -158,29 +170,10 @@ def main():
         f"- If progress.md records higher rounds, never restart from round 1.\n"
         f"- Run until halt condition; do NOT ask 'should I continue?'\n"
         f"- All state on disk (progress.md, findings.md, results.tsv).\n"
-        f"- Use Agent subagent_type codex-cli for implementation, gemini-cli for literature checks.\n"
+        f"- Use Codex directly for implementation; use `gemini` CLI for literature checks when available.\n"
     )
 
-    try:
-        result = subprocess.run(
-            [CONFIG.claude_bin, "-p", "--model", CONFIG.claude_model,
-             "--dangerously-skip-permissions",
-             prompt],
-            capture_output=True, text=True,
-            timeout=args.timeout_seconds,
-            cwd=cwd,
-        )
-    except subprocess.TimeoutExpired as exc:
-        write_status({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "workspace": cwd,
-            "trigger": reason,
-            "timeout_seconds": args.timeout_seconds,
-            "returncode": "timeout",
-            "stderr_tail": ((exc.stderr or "") if isinstance(exc.stderr, str) else "")[-400:],
-        })
-        print(f"ClaudeCode timed out after {args.timeout_seconds}s")
-        return 124
+    result = run_primary(prompt, cwd=cwd, mode="workspace-write", timeout=args.timeout_seconds)
 
     if result.returncode == 0:
         open(MARKER, "w").close()
@@ -198,7 +191,7 @@ def main():
     if output:
         print(output[-4000:] if len(output) > 4000 else output)
     else:
-        print(f"ClaudeCode exited {result.returncode}: {(result.stderr or '')[:500]}")
+        print(f"Codex exited {result.returncode}: {(result.stderr or '')[:500]}")
 
 
 if __name__ == "__main__":

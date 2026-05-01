@@ -39,14 +39,15 @@ This command is bound to the double-layer model from `~/claw/Beatless/standards/
 6. **Evidence before assertions** (pua Non-Negotiable One). Never claim "fixed" without having pasted the passing test output into `findings.md` first.
 7. **Exhaust the 5-step Elevate before giving up** (pua methodology). See §Internal Debugging Loop below.
 
-## Plugin Policy
+## Executor Policy
 
-Same as github-pr: plugins are optional. Every step must work with Claude + Bash alone.
+Same as github-pr: this pipeline is executed by Codex directly. Every step
+must work with Codex + Bash alone. Gemini is optional for large review context.
 
-| Plugin | Use for | Fallback |
+| Tool | Use for | Fallback |
 |--------|---------|----------|
-| Codex | Implementing requested code changes | Claude Edit + Bash test |
-| Gemini | Understanding large review context | Claude reads key files |
+| Codex | Implementing requested code changes | manual block with evidence |
+| Gemini | Understanding large review context | Codex reads key files |
 
 **Try once, fallback immediately.** No retries.
 
@@ -188,18 +189,9 @@ Persists state across context resets. Right tool when a CI regression survives m
 
 1. `cd ~/workspace/contrib/<repo-name>/`
 2. Read ALL review comments before making any changes (per §4a).
-3. For self-contained fixes, delegate to Codex. Two equivalent paths — prefer Bash in headless/cron context:
-
-   **Path A — Bash CLI:**
-   ```bash
-   codex exec "<exact-failure>
-   Fix in <file>:<line>. Run <specific-test> after edit; paste passing output."
-   ```
-
-   **Path B — Agent tool:**
-   ```
-   Agent(subagent_type="codex:codex-rescue", prompt="<same prompt>")
-   ```
+3. For self-contained fixes, implement directly in the current Codex session.
+   Run the specific failing test after the edit and paste the passing output
+   into `findings.md`.
 
    For understanding large review contexts (many comments across many files), use Gemini:
    ```bash
@@ -254,6 +246,6 @@ Write to `~/workspace/pr-stage/_followup/<YYYYMMDD-HHMMSS>.md`:
 ### Internal Loops Run
 - <repo>#<pr>: exhausted pua 5-step for CI failure — root cause was <summary>
 
-### Plugins Used
-- [list or "Claude-only"]
+### Optional Tools Used
+- [list or "Codex-only"]
 ```

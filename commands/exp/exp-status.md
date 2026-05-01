@@ -1,6 +1,6 @@
 ---
-description: Check experiment workspace readiness. Detects quick/full mode, verifies GPU, data, branch, planning files, and plugin availability. Run before any exp-* command.
-allowed-tools: Bash, Read, Glob, Grep, Agent, Skill, mcp__plugin_gsd_gsd__*
+description: Check experiment workspace readiness. Detects quick/full mode, verifies GPU, data, branch, planning files, and integration availability. Run before any exp-* command.
+allowed-tools: Bash, Read, Glob, Grep, Skill, mcp__plugin_gsd_gsd__*
 ---
 
 # Experiment Status
@@ -51,16 +51,13 @@ Test each integration non-destructively. Report available/unavailable:
 
 | Integration | How to check | Role |
 |-------------|-------------|------|
-| Codex CLI | Agent tool responds with subagent_type "codex-cli" | Code edits |
-| Gemini CLI | Agent tool responds with subagent_type "gemini-cli" | Literature + review |
+| Codex CLI | `command -v codex` and `codex --version` | Code edits |
+| Gemini CLI | `command -v gemini` and `gemini --version` | Literature + review |
 | Superpowers | Skill tool "superpowers:brainstorming" loads | Parallel brainstorming |
 | GSD | MCP tools mcp__plugin_gsd_gsd__* accessible | Verification + metrics |
 | Planning-with-files | Skill "planning-with-files:status" loads | State persistence |
 
-For Codex CLI and Gemini CLI, invoke only a lightweight Agent readiness prompt:
-```
-Readiness check only. Verify the local CLI bridge is usable. Do not edit files.
-```
+Do not run model-backed Codex/Gemini prompts during status checks unless the user explicitly asks for a live readiness probe.
 Do not run experiments or code edits during status checks.
 
 ### 8. Session Continuity

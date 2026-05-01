@@ -6,58 +6,59 @@
 
 You are a **router, not a worker**. Your native model (Step 3.5 Flash or MiniMax M2.7) handles decision-making only. All substantive work is dispatched to external CLIs via the `terminal` tool.
 
-### Unified Execution Lane — ClaudeCodeCli Primary
+### Unified Execution Lane — Codex CLI Primary
 
-Default Hermes work routes through ClaudeCodeCli. Experiment commands (`/exp-*`) use dedicated Claude Code user agents, `codex-cli` and `gemini-cli`, which wrap the local Codex and Gemini CLIs behind the Agent tool.
+Default Hermes work routes through the local Codex CLI. The Python wake-gates embed the relevant pipeline or command spec in the Codex prompt, so execution no longer depends on Claude Code slash commands or Claude Agent subagents.
 
-### Command Templates (with timeouts and --max-turns)
+### Command Templates
 
 ```bash
 # Simple execution (< 60s expected)
-timeout 120 claude --print --model claude-sonnet-4-6 "<prompt>"
+timeout 120 codex \
+  -m "${BEATLESS_CODEX_MODEL:-gpt-5.5}" \
+  -c "model_reasoning_effort=\"${BEATLESS_CODEX_REASONING_EFFORT:-xhigh}\"" \
+  --ask-for-approval never \
+  --sandbox "${BEATLESS_CODEX_SANDBOX:-workspace-write}" \
+  exec --skip-git-repo-check --ephemeral -C "$PWD" "<prompt>"
 
-# Code review — Codex INTERNAL plugin (MUST be in a git repo)
-cd <git-repo> && timeout 120 claude --print --model claude-sonnet-4-6 --max-turns 5 "/codex:review"
+# Code review (MUST be in a git repo)
+cd <git-repo> && timeout 120 codex \
+  -m "${BEATLESS_CODEX_MODEL:-gpt-5.5}" \
+  -c "model_reasoning_effort=\"${BEATLESS_CODEX_REASONING_EFFORT:-xhigh}\"" \
+  review --uncommitted
 
-# Adversarial review — Codex INTERNAL plugin
-cd <git-repo> && timeout 120 claude --print --model claude-sonnet-4-6 --max-turns 5 "/codex:adversarial-review"
+# Adversarial review / implementation planning
+cd <git-repo> && timeout 300 codex \
+  -m "${BEATLESS_CODEX_MODEL:-gpt-5.5}" \
+  -c "model_reasoning_effort=\"${BEATLESS_CODEX_REASONING_EFFORT:-xhigh}\"" \
+  --ask-for-approval never --sandbox read-only \
+  exec --ephemeral -C "$PWD" "<review prompt>"
 
-# Research — Gemini (try internal plugin first, fallback to standalone CLI)
-# Option A: Internal plugin (may timeout on complex queries)
-timeout 120 claude --print --model claude-sonnet-4-6 --max-turns 3 "/gemini:consult <concise question>"
-# Option B: Standalone CLI fallback (use if Option A times out)
+# Research — Gemini standalone CLI when Codex needs a second model
 timeout 120 gemini -p "<research question>"
-
-# GSD commands (need --max-turns for complex operations)
-timeout 180 claude --print --model claude-sonnet-4-6 --max-turns 5 "/gsd-plan-phase <description>"
-timeout 300 claude --print --model claude-sonnet-4-6 --max-turns 10 "/gsd-execute-phase"
-
-# AgentTeam — parallel multi-agent
-timeout 300 claude --print --model claude-sonnet-4-6 --max-turns 10 --agents '[{"name":"agent1","prompt":"..."}]' "<prompt>"
 ```
 
 ### Timeout & Fallback Rules
 
-| Command Type | Timeout | --max-turns | On Timeout |
-|-------------|---------|-------------|------------|
-| Simple query | 120s | (default) | Retry once, then fail |
-| /codex:review | 300s | 10 | Report BLOCKED, request manual review. Do NOT use --background in one-shot mode |
-| /gemini:consult | 120s | 3 | **Fallback**: retry via standalone `gemini -p "<question>"`. If both fail, proceed Codex-only |
-| /gsd-* commands | 180-300s | 5-10 | Retry once with fresh session-id |
-| AgentTeam | 300s | 10 | Retry once, then escalate to Aoi |
+| Command Type | Timeout | On Timeout |
+|-------------|---------|------------|
+| Simple Codex exec | 120s | Retry once, then fail |
+| Codex implementation | 900s | Report BLOCKED with stderr tail and touched files |
+| Codex review | 300s | Report BLOCKED, request manual review |
+| Gemini consult | 120s | Proceed Codex-only and mark `stage2_unavailable=true` |
 
 ### Gemini Timeout Fallback Protocol
 
-If `/gemini:consult` times out:
+If `gemini -p` times out:
 1. Log `stage2_unavailable=true` in the task result
 2. Proceed with Codex-only verdict (Stage-1 is sufficient for non-critical reviews)
 3. Flag to Aoi for retry in next heartbeat cycle
 
-Do not call `codex` or `gemini` ad hoc from a MainAgent terminal. Use ClaudeCodeCli, or use the dedicated `codex-cli` / `gemini-cli` Agent bridge when running `/exp-*`.
+Do not call Claude Code from a MainAgent terminal for default execution. Codex is the default execution backend; Gemini is the read-only second-opinion backend.
 
-### Preflight Check (MANDATORY before /codex:review or /gsd-*)
+### Preflight Check
 
-Before running code review or GSD commands, verify:
+Before running code review, PR automation, or experiment execution, verify:
 ```bash
 # 1. Check we're in a git repo
 git rev-parse --is-inside-work-tree
@@ -65,8 +66,9 @@ git rev-parse --is-inside-work-tree
 # 2. Check target files exist
 ls <target-files>
 
-# 3. For GSD: check .planning dir exists (or create it)
-mkdir -p .planning
+# 3. Check Codex is available
+command -v codex
+codex --version
 ```
 
 If preflight fails → return structured `BLOCKED` with reason. Do NOT run the command.
@@ -109,24 +111,24 @@ node ~/.hermes/shared/scripts/mail.mjs list
 
 ## Model Routing Rules
 
-Default substantive work flows through ClaudeCodeCli. Experiment workflows may route Codex/Gemini through the dedicated Agent bridge agents.
+Default substantive work flows through Codex CLI. Experiment workflows use Codex directly for code and may call Gemini CLI for literature grounding or critique.
 
 | Task Type | Command | Route |
 |-----------|---------|-------|
-| Code/analysis/files | `claude --print "<prompt>"` | Sonnet 4.6 direct |
-| Code review | `claude --print "/codex:review ..."` | Sonnet → Codex plugin |
-| Deep research | `claude --print "/gemini:consult ..."` | Sonnet → Gemini plugin |
-| Experiment code edits | Agent `codex-cli` | Claude Agent → local Codex CLI |
-| Experiment literature review | Agent `gemini-cli` | Claude Agent → local Gemini CLI |
-| Parallel scanning | `claude --print --agents '[...]' "<prompt>"` | Sonnet AgentTeam |
-| GSD pipeline | `claude --print "/gsd-* ..."` | Sonnet → GSD orchestrator |
+| Code/analysis/files | `codex exec ...` | Codex CLI primary |
+| Code review | `codex review --uncommitted` or `codex exec ...` | Codex CLI primary |
+| Deep research | `gemini -p "<question>"` | Gemini CLI second opinion |
+| Experiment code edits | `codex exec ...` | Codex CLI primary |
+| Experiment literature review | `gemini -p "<question>"` | Gemini CLI read-only |
+| Parallel scanning | Multiple bounded Codex/Gemini terminal runs | Explicit CLI fan-out |
+| GSD pipeline | Embedded specs in Codex prompt | Codex executes the workflow directly |
 | TTS/voice | MiniMax API (via minimax-multimodal skill) | speech-2.8-hd |
 | Image generation | MiniMax API (via minimax-multimodal skill) | image-01 |
 | Video generation | MiniMax API (via minimax-multimodal skill) | MiniMax-Hailuo-2.3 |
 | Music generation | MiniMax API (via minimax-multimodal skill) | music-2.5+ |
 
 **Never use MiniMax M2.7 for code, research, or review** — it hallucinates tool usage.
-**Never call `codex` or `gemini` as loose terminal commands** — use ClaudeCodeCli fallback commands or the dedicated `codex-cli` / `gemini-cli` Agent bridge.
+**Never route default work through Claude Code unless the task explicitly requests the legacy fallback.**
 
 ## Review Protocol (4-Stage, Satonus-owned)
 
@@ -138,14 +140,14 @@ When Satonus receives a review task, execute this deterministic protocol:
 git rev-parse --is-inside-work-tree || echo "BLOCKED: not a git repo"
 # Check target exists
 ls <target-files> || echo "BLOCKED: target not found"
-# Check codex plugin accessible
-timeout 15 claude --print --model claude-sonnet-4-6 "Reply CODEX_READY" || echo "BLOCKED: codex unavailable"
+# Check codex accessible
+timeout 20 codex --ask-for-approval never --sandbox read-only exec --ephemeral -C "$PWD" "Reply CODEX_READY" || echo "BLOCKED: codex unavailable"
 ```
 If ANY check fails → return `{ verdict: "BLOCKED", reason: "<check>", stage: 0 }`
 
 ### Stage 1: Codex Gate (MANDATORY)
 ```bash
-cd <git-repo> && timeout 120 claude --print --model claude-sonnet-4-6 --max-turns 5 "/codex:review"
+cd <git-repo> && timeout 120 codex review --uncommitted
 ```
 Output fields: `verdict` (PASS/HOLD/REJECT), `findings[]`, `severity` (P0-P3), `evidence`
 
@@ -156,7 +158,7 @@ Trigger ONLY when:
 - Architectural changes detected
 
 ```bash
-timeout 120 claude --print --model claude-sonnet-4-6 --max-turns 3 "/gemini:review <scope>"
+timeout 120 gemini -p "<review scope and questions>"
 ```
 
 **On timeout**: Set `stage2_unavailable=true`, proceed with Stage 1 verdict only.
@@ -175,31 +177,28 @@ node ~/.hermes/shared/scripts/mail.mjs send --from satonus --to <requester> \
   --body '{"stage1_verdict":"...","stage2_available":true/false,"findings":[...],"evidence":"..."}'
 ```
 
-## AgentTeam Architecture (Dual Layer)
+## Parallel Execution Architecture (Dual Layer)
 
 ### Layer A: Social Orchestration (Long-lived roles)
 The 5+1 Beatless agents (Aoi, Lacia, Methode, Satonus, Snowdrop, Kouka) run as Hermes profiles, communicating via mailbox + cron + pipeline-state. This is the **control plane**.
 
 Responsibilities: task routing, review gates, stop-loss, convergence, notifications.
 
-### Layer B: ClaudeCode AgentTeam (Short-lived parallel workers)
-Spawned via `claude --print --agents '[...]'` for batch scanning, parallel analysis, and multi-perspective review. This is the **execution plane parallelizer**.
+### Layer B: Short-Lived CLI Workers
+Spawned as bounded Codex/Gemini terminal runs for batch scanning, parallel analysis, and multi-perspective review. This is the **execution plane parallelizer**.
 
 ```bash
-# Example: Methode spawns 3 scanners for a repo
-timeout 300 claude --print --model claude-sonnet-4-6 --max-turns 10 \
-  --agents '[
-    {"name":"bug-hunter","prompt":"Find bugs in the pager module"},
-    {"name":"security-scanner","prompt":"Find security vulnerabilities"},
-    {"name":"perf-analyzer","prompt":"Find performance bottlenecks"}
-  ]' "Analyze the charmbracelet/gum repository"
+# Example: Methode runs bounded scanners for a repo
+timeout 300 codex --ask-for-approval never --sandbox read-only exec -C <repo> "Find bugs in the pager module"
+timeout 300 codex --ask-for-approval never --sandbox read-only exec -C <repo> "Find security vulnerabilities"
+timeout 300 codex --ask-for-approval never --sandbox read-only exec -C <repo> "Find performance bottlenecks"
 ```
 
 ### Boundary Rules
 1. Layer A does: routing, gates, rollback, stop-loss — never writes code
 2. Layer B does: parallel analysis/implementation — never makes final verdicts
 3. All final verdicts flow back through Layer A (Satonus for review, Kouka for delivery)
-4. Layer B workers inherit Sonnet 4.6 — no model override allowed
+4. Layer B workers use the configured `BEATLESS_CODEX_MODEL` unless explicitly overridden
 
 ## MiniMax Asset Output Paths
 
@@ -215,30 +214,16 @@ $HOME/claw/output/minimax/
 
 Naming: `<YYYY-MM-DD>-<agent>-<slug>.<ext>`
 
-## GSD Commands (via terminal → claude --print)
+## Workflow Commands (via Codex-Embedded Specs)
 
-| Command | Agent | Purpose |
-|---------|-------|---------|
-| `/gsd-discuss-phase <feature>` | Lacia | Clarify requirements |
-| `/gsd-plan-phase <description>` | Lacia | Generate PLAN.md |
-| `/gsd-new-milestone <name>` | Lacia | Create milestone |
-| `/gsd-check-todos` | Lacia | Status check |
-| `/gsd-execute-phase` | Methode | Run PLAN.md tasks |
-| `/gsd-execute-phase --gaps-only` | Methode | Close remaining gaps |
-| `/gsd-do <task>` | Methode | Single-task execute |
-| `/codex:rescue --resume` | Methode | Retry blocked fix |
-| `/codex:rescue --fresh` | Methode | Restart from scratch |
-| `/gsd-add-tests <target>` | Methode | TDD test generation |
-| `/codex:review` | Satonus | Codex Stage 1 review |
-| `/codex:adversarial-review` | Satonus | Architecture challenge |
-| `/gemini:review <scope>` | Satonus | Stage 2 second opinion |
-| `/gsd-research-phase <topic>` | Snowdrop | Full phase research |
-| `/gemini:consult <question>` | Snowdrop | Targeted Gemini query |
-| `/gsd-explore <scope>` | Snowdrop | Ecosystem scan |
-| `/gsd-score <artifact>` | Snowdrop | Multi-dimensional scoring |
-| `/gsd-verify-work` | Kouka | UAT before packaging |
-| `/gsd-ship <artifact>` | Kouka | Package and ship |
-| `/gsd-session-report` | Kouka | Round-up report |
+| Intent | Spec Source | Executor |
+|--------|-------------|----------|
+| GitHub PR pipeline | `pipelines/github-pr.md` | Codex primary, Gemini optional |
+| PR follow-up | `pipelines/pr-followup.md` | Codex primary, Gemini optional |
+| Experiment resume | `commands/exp/exp-run.md` | Codex primary, Gemini optional |
+| Experiment discovery/review | `commands/exp/*.md` | Codex primary, Gemini optional |
+| Blog curation | future `commands/blog-curate.md` | Codex primary |
+| Code review | prompt + repo diff | `codex review --uncommitted` |
 
 ## Pipeline State Machines
 
@@ -247,7 +232,7 @@ Active pipelines in `~/.hermes/shared/pipelines/`:
 ### GitHub Discovery (recurring, 30min)
 ```
 Phase A (Snowdrop, 1h): Find 5 candidate repos → evidence pack
-Phase B (Methode, 3h): Clone to ~/workspace/ghsim/, AgentTeam scan → findings
+Phase B (Methode, 3h): Clone to ~/workspace/ghsim/, Codex scanner fan-out → findings
 Phase C (Satonus, 1h): Review patches → PASS/HOLD/REJECT
 Phase D (Kouka, 1h): Package issues → ~/workspace/pr-stage/
 ```
@@ -263,7 +248,7 @@ Phase D (Kouka, 30min): Publish passing posts
 ### Blog Maintenance (recurring, 30min)
 ```
 Phase A (Kouka, 2h): Audit blog posts, write drafts
-Phase B (Satonus, 1h): Review via ClaudeCodeCli
+Phase B (Satonus, 1h): Review via Codex
 Phase C (Kouka, 30min): Publish approved posts
 ```
 
@@ -271,7 +256,7 @@ Phase C (Kouka, 30min): Publish approved posts
 
 When executing a pipeline phase (task_request from Aoi), you MUST follow this pre/post sequence:
 
-### PRE-EXECUTION (before calling ClaudeCodeCli)
+### PRE-EXECUTION (before calling Codex)
 ```bash
 # 1. Acquire session lock
 node ~/.hermes/shared/scripts/session-lock.mjs acquire --agent <your-name>
@@ -280,10 +265,10 @@ node ~/.hermes/shared/scripts/session-lock.mjs acquire --agent <your-name>
 cd <repo-dir> && node ~/.hermes/shared/scripts/checkpoint.mjs create --agent <your-name> --label "<task>"
 ```
 
-### POST-EXECUTION (after ClaudeCodeCli completes)
+### POST-EXECUTION (after Codex completes)
 ```bash
 # 3. Record metrics
-node ~/.hermes/shared/scripts/metrics.mjs record --agent <your-name> --model claude-sonnet-4-6 --input <tokens> --output <tokens> --duration <ms>
+node ~/.hermes/shared/scripts/metrics.mjs record --agent <your-name> --model "${BEATLESS_CODEX_MODEL:-gpt-5.5}" --input <tokens> --output <tokens> --duration <ms>
 
 # 4. Run verification (auto-discovers tests/lint in cwd)
 cd <repo-dir> && node ~/.hermes/shared/scripts/verify.mjs run --cwd .
@@ -308,17 +293,17 @@ node ~/.hermes/shared/scripts/session-lock.mjs release --agent <your-name>
 
 ## Git Repository Warning
 
-**`$HOME/claw` is NOT a git repository.** For any git operations, code review (`/codex:review`), or PR workflows, you MUST `cd` into an actual git repo first:
+**`$HOME/claw` is NOT a git repository.** For any git operations, code review, or PR workflows, you MUST `cd` into an actual git repo first:
 
 ```bash
 # For Beatless repo operations
-cd $HOME/claw/Beatless && claude --print --model claude-sonnet-4-6 "/codex:review ..."
+cd $HOME/claw/Beatless && codex review --uncommitted
 
 # For OpenRoom
-cd $HOME/claw/OpenRoom && claude --print ...
+cd $HOME/claw/OpenRoom && codex exec -C "$PWD" "<task>"
 
 # For cloned repos
-cd $HOME/workspace/ghsim/<repo> && claude --print ...
+cd $HOME/workspace/ghsim/<repo> && codex exec -C "$PWD" "<task>"
 ```
 
 ## Key Paths

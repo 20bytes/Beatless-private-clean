@@ -11,7 +11,7 @@ Per roadmap Phase 2.4 decision (2026-04-23):
 The audit file lands at ~/.hermes/shared/.blog-audit.md for human review.
 A tiny status JSON goes to ~/.hermes/shared/.last-blog-maintenance-status.
 
-Does NOT spawn claude -p. Returns {"wakeAgent": false} so Hermes runs
+Does NOT spawn Codex. Returns {"wakeAgent": false} so Hermes runs
 its own lightweight summary loop rather than a full agent tick.
 """
 import json
@@ -90,7 +90,7 @@ def render_audit_md(missing_zh, stale):
         "## What this report is NOT",
         "",
         "- This is an audit. No posts are written automatically.",
-        "- To write/translate: open Claude Code, run `/blog-curate` (once implemented),",
+        "- To write/translate: run the Codex-backed `/blog-curate` flow (once implemented),",
         "  pick an item from this list, get a draft, commit it yourself.",
         "- The 3-section template for posts is still pending the user's spec.",
     ]
@@ -122,7 +122,7 @@ def main():
     }
     STATUS_JSON.write_text(json.dumps(status, indent=2))
     # Return wakeAgent: false — Hermes runs its own lightweight summary
-    # instead of a full claude -p execution.
+    # instead of a full Codex execution.
     print(json.dumps({"wakeAgent": False}))
     print(f"audit-md: {AUDIT_MD}  missing-zh: {len(missing_zh)}  stale: {len(stale)}")
     return 0

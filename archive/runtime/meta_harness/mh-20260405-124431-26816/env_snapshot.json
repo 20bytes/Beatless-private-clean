@@ -1,5 +1,5 @@
 {
-  "cwd": "/home/yarizakurahime/claw/Beatless/runtime/worktrees/mh-20260405-124431-26816",
+  "cwd": "$HOME/claw/Beatless/runtime/worktrees/mh-20260405-124431-26816",
   "top_level_entries": [
     ".git",
     ".github",
@@ -13,13 +13,13 @@
     "scripts"
   ],
   "tool_paths": {
-    "python3": "/home/yarizakurahime/miniconda3/bin/python3",
-    "node": "/home/yarizakurahime/.local/bin/node",
-    "bun": "/home/yarizakurahime/.local/bin/bun",
-    "cargo": "/home/yarizakurahime/.local/bin/cargo",
-    "claude": "/home/yarizakurahime/.local/bin/claude",
-    "codex": "/home/yarizakurahime/.local/bin/codex",
-    "gemini": "/home/yarizakurahime/.local/bin/gemini",
-    "nlm": "/home/yarizakurahime/.local/bin/nlm"
+    "python3": "$HOME/miniconda3/bin/python3",
+    "node": "$HOME/.local/bin/node",
+    "bun": "$HOME/.local/bin/bun",
+    "cargo": "$HOME/.local/bin/cargo",
+    "claude": "$HOME/.local/bin/claude",
+    "codex": "$HOME/.local/bin/codex",
+    "gemini": "$HOME/.local/bin/gemini",
+    "nlm": "$HOME/.local/bin/nlm"
   }
 }

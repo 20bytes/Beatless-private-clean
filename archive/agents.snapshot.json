@@ -4,31 +4,31 @@
       "id": "lacia",
       "name": "Lacia",
       "model": "stepfun/step-3.5-flash",
-      "workspace": "/home/yarizakurahime/claw/.openclaw/workspace-lacia"
+      "workspace": "$HOME/claw/.openclaw/workspace-lacia"
     },
     {
       "id": "kouka",
       "name": "Kouka",
       "model": "stepfun/step-3.5-flash",
-      "workspace": "/home/yarizakurahime/claw/.openclaw/workspace-kouka"
+      "workspace": "$HOME/claw/.openclaw/workspace-kouka"
     },
     {
       "id": "methode",
       "name": "Methode",
       "model": "stepfun/step-3.5-flash",
-      "workspace": "/home/yarizakurahime/claw/.openclaw/workspace-methode"
+      "workspace": "$HOME/claw/.openclaw/workspace-methode"
     },
     {
       "id": "satonus",
       "name": "Satonus",
       "model": "stepfun/step-3.5-flash",
-      "workspace": "/home/yarizakurahime/claw/.openclaw/workspace-satonus"
+      "workspace": "$HOME/claw/.openclaw/workspace-satonus"
     },
     {
       "id": "snowdrop",
       "name": "Snowdrop",
       "model": "stepfun/step-3.5-flash",
-      "workspace": "/home/yarizakurahime/claw/.openclaw/workspace-snowdrop"
+      "workspace": "$HOME/claw/.openclaw/workspace-snowdrop"
     }
   ]
 }

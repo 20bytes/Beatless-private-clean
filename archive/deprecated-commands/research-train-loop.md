@@ -317,8 +317,8 @@ You are a Research Teammate on the "<team-name>" team. Your team lead is the orc
 
 ## Instructions (follow every step, do NOT skip)
 
-1. Read the pipeline at /home/yarizakurahime/.claude/agents/research-teammate.md (steps 0A–12 IN ORDER).
-2. Read compact methodology: /home/yarizakurahime/.claude/skills/research-dialectics/references/methodology-summary.md
+1. Read the pipeline at $HOME/.claude/agents/research-teammate.md (steps 0A–12 IN ORDER).
+2. Read compact methodology: $HOME/.claude/skills/research-dialectics/references/methodology-summary.md
 3. Do NOT read Research_Methodology.md or TwoTopic.md (too long). Skim project findings.md for recent round context.
 
 4. Execute the full pipeline from your assigned dimension.
@@ -330,7 +330,7 @@ You are a Research Teammate on the "<team-name>" team. Your team lead is the orc
    Use Skill: /gemini:consult "Play devil's advocate against this idea: <describe the dimension-specific hypothesis>. Attack it with (1) a simpler baseline that likely matches or beats it, (2) a prior work that may already solve this (cite paper), (3) a fundamental flaw that makes it unlikely to generalize beyond our 6-case val."
 
 7. Invoke Codex for feasibility:
-   Use Skill: /codex:rescue "Assess feasibility of <method> in the BioScanMini + decoder codebase at /home/yarizakurahime/DeepLearning/3D/src. Check: (1) compute requirement for one training run on 2× RTX 4090 48GB, (2) implementation complexity (lines changed, files touched), (3) integration risk (breaks existing weighted_dicece + CSSR + curriculum sampling?), (4) likely gain magnitude vs the +0.01 we need. Be brutally honest."
+   Use Skill: /codex:rescue "Assess feasibility of <method> in the BioScanMini + decoder codebase at $HOME/DeepLearning/3D/src. Check: (1) compute requirement for one training run on 2× RTX 4090 48GB, (2) implementation complexity (lines changed, files touched), (3) integration risk (breaks existing weighted_dicece + CSSR + curriculum sampling?), (4) likely gain magnitude vs the +0.01 we need. Be brutally honest."
 
 8. Write your report to findings.md under `### Teammate Report — <dimension> — Round N` with these sections:
    - Hypothesis (1 sentence, falsifiable)
@@ -415,7 +415,7 @@ This replaces a local-minimum detention cell with a structured reframing step. T
 ## Quick Signature
 
 ```
-/research-train-loop /home/yarizakurahime/DeepLearning/3D/Task.md
+/research-train-loop $HOME/DeepLearning/3D/Task.md
 ```
 
 On receiving this, execute Step 0 → Step 8 autonomously. The only thing the human touches is Task.md.

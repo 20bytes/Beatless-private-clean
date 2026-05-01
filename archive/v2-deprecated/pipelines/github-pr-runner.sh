@@ -24,7 +24,7 @@ MANDATORY CHAIN VERIFICATION — every link below MUST fire or the trial FAILS:
    - Must have a HUMAN maintainer comment (authorAssociation = MEMBER/COLLABORATOR/OWNER, NOT a bot like Dosu)
    - No one has asked "assign me" or "I will work on this" in comments
    - No competing PRs exist (check with gh pr list --search)
-   - Not filed by CrepuscularIRIS
+   - Not filed by 20bytes
 
 3. GEMINI AGENT: Spawn gemini:gemini-consult for repo evaluation (Phase 2). Record what Gemini returned in findings.md.
 

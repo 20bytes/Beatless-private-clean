@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -u
-LOG=/home/lingxufeng/.openclaw/logs/gateway-supervisor.log
-GWLOG=/home/lingxufeng/.openclaw/logs/gateway-live.log
-CMD=(/home/lingxufeng/claw/openclaw-local gateway run --port 18789 --bind loopback --force)
+LOG=$HOME/.openclaw/logs/gateway-supervisor.log
+GWLOG=$HOME/.openclaw/logs/gateway-live.log
+CMD=($HOME/claw/openclaw-local gateway run --port 18789 --bind loopback --force)
 
 echo "[$(date '+%F %T')] supervisor started" >> "$LOG"
 while true; do

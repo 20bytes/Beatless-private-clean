@@ -39,13 +39,13 @@ claude --permission-mode bypassPermissions --model ... --print ...
 
 | ID | Severity | Issue | Evidence | Owner |
 |----|----------|-------|----------|-------|
-| M-20260409-1 | P1 | **claude_code_cli invalid CLI flag** — all 5 failures trace to `--permission-mode bypassPermissions` | `/home/yarizakurahime/claw/.openclaw/extensions/openclaw-rawcli-router/index.js:121` uses invalid flag; `claude --help` shows no such flag | Methode |
+| M-20260409-1 | P1 | **claude_code_cli invalid CLI flag** — all 5 failures trace to `--permission-mode bypassPermissions` | `$HOME/claw/.openclaw/extensions/openclaw-rawcli-router/index.js:121` uses invalid flag; `claude --help` shows no such flag | Methode |
 | M-20260409-2 | P2 | **RawCli Router line count at boundary** — index.js = 200 lines (target <200) | `wc -l` confirms 200; previous target was <200 | Methode |
 | M-20260409-3 | P2 | **memory-manager legacy skill dangling** — enabled in config but no `skill.json` (old shell-script structure) | Config: `skills.entries.memory-manager.enabled: true`; directory has no `skill.json`; could cause load warnings | Methode |
 
 ### Actions Taken
 
-- Verified claude CLI availability: `/home/yarizakurahime/.local/node-v22.18.0-linux-x64/bin/claude` v2.1.92 — binary present and runnable
+- Verified claude CLI availability: `$HOME/.local/node-v22.18.0-linux-x64/bin/claude` v2.1.92 — binary present and runnable
 - Checked environment: `ANTHROPIC_API_KEY` set (value redacted); `CLAUDE_CODE_PERMISSION_MODE=bypassPermissions` present (legacy env, not used by claude CLI directly)
 - Inspected rawcli-router code (200 lines); identified invalid flag at spawn args
 - Checked memory-manager skill directory: shell-script legacy format, no plugin `skill.json`
@@ -89,7 +89,7 @@ claude --permission-mode bypassPermissions --model ... --print ...
 | **StepFun Push** (`.openclaw/scripts/notify-user.sh`) | ✅ Done | 8/8 push succeeded. Full idle-cycle E2E verified (4 idle_reports → Lacia aggregates → StepFun push → mark all read). |
 | **Idle Aggregation** | ✅ Done | Lacia HEARTBEAT.md: reads mailbox, if ≥3 idle → pushes to user via StepFun. 4 non-Lacia agents: send idle_report when no work. 60-min cooldown. |
 | **Blog Cleanup** | ✅ Done | 3 posts flipped to `draft: true` (kimi-k2-analysis, openclaw-skills, daily-research-20260324). Non-destructive. |
-| **GH Workspace** | ✅ Done | `/home/yarizakurahime/workspace/{ghsim,pr-stage,archive}` created. Pipeline design complete (PIPELINE_V2.md §4). |
+| **GH Workspace** | ✅ Done | `$HOME/workspace/{ghsim,pr-stage,archive}` created. Pipeline design complete (PIPELINE_V2.md §4). |
 | **OpenRoom deps** | ✅ Done | `pnpm install` succeeded. `pnpm dev` starts cleanly on :3001. |
 | **GSD2 Runtime Migration** | ✅ Done | 3 modules ported: metrics ledger, verification gate, model cost table. |
 
@@ -120,4 +120,4 @@ claude --permission-mode bypassPermissions --model ... --print ...
 3. **Wire verify.mjs** into Satonus CI-Guard cron (post-execution check on recent changes)
 4. **Port session-lock** for long-running agent sessions (prevent parallel heartbeat collision)
 5. **Blog maintenance cron Phase B** — approved design, needs HEARTBEAT.md prompt templating
-6. **GitHub discovery pipeline** — approved design at `/home/yarizakurahime/workspace/`, needs first manual run
+6. **GitHub discovery pipeline** — approved design at `$HOME/workspace/`, needs first manual run

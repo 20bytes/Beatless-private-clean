@@ -10,7 +10,7 @@ Generated: 2026-04-09T23:10:00Z
 | C (package) | Kouka | Pending — awaiting review from Satonus |
 
 ### Artifacts
-- Candidate report: `/home/lingxufeng/workspace/ghsim/candidates-report.md`
+- Candidate report: `$HOME/workspace/ghsim/candidates-report.md`
 - Analyzed repos: `cli`, `Pulse`, `fleet` (all 5k–30k stars, updated <30d, have good-first-issues)
 
 ### Status

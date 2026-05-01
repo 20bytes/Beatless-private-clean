@@ -125,11 +125,3 @@ Use `.env.example` as the public template and keep provider keys, Zotero IDs, Gi
 ## License
 
 MIT
-
-## GitHub Impact
-
-Star growth can be viewed with GitHub Star History:
-
-[![Star History Chart](https://api.star-history.com/svg?repos=20bytes/Beatless&type=Date)](https://star-history.com/#20bytes/Beatless&Date)
-
-Direct link: [https://star-history.com/#20bytes/Beatless&Date](https://star-history.com/#20bytes/Beatless&Date)

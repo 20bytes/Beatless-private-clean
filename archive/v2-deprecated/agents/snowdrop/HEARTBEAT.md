@@ -68,7 +68,7 @@ When the cron wakes me:
 
 If after processing my mailbox AND any cron work I have nothing to do:
 ```
-exec node /home/lingxufeng/claw/.openclaw/scripts/mail.mjs send \
+exec node $HOME/claw/.openclaw/scripts/mail.mjs send \
   --from snowdrop --to lacia --type idle_report \
   --subject "idle tick" --body "snowdrop idle — no cron fired, no mailbox work this cycle"
 ```

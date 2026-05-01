@@ -1,8 +1,7 @@
 # Changelog
 
-This private Beatless repository is a clean Git repository without upstream
-author history. The entries below summarize the project changes preserved in
-this version.
+This private Beatless repository uses an independent clean Git history. The
+entries below summarize the project changes preserved in this version.
 
 ## Current Private Version
 
@@ -10,7 +9,7 @@ this version.
   kept separate from private automation/runtime configuration.
 - Reworked the public README with a concise framework overview, architecture
   diagram, quick-start commands, dashboard notes, public-repo safety guidance,
-  and a Star History chart.
+  and private-repository safety guidance.
 - Added automation preflight and shared runtime configuration through
   `hermes-scripts/preflight.py` and `hermes-scripts/beatless_config.py`.
 - Added GitHub response and PR discovery dry-run support for safe local checks
@@ -27,4 +26,3 @@ this version.
 - Preserved architecture, pipeline, standard, plan, and archive materials as
   repository content while excluding local secrets, dependency directories,
   build outputs, and machine-specific configuration.
-

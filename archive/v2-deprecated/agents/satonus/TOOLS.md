@@ -79,7 +79,7 @@ reason: {one line}
 ### Send a letter
 
 ```
-exec: node /home/lingxufeng/claw/.openclaw/scripts/mail.mjs send --from <me> --to <target> --type <type> --subject "<short>" --body "<body text>"
+exec: node $HOME/claw/.openclaw/scripts/mail.mjs send --from <me> --to <target> --type <type> --subject "<short>" --body "<body text>"
 ```
 
 Types: `message`, `idle_report`, `task_request`, `task_result`, `review_verdict`, `alert`, `ack`.
@@ -87,13 +87,13 @@ Types: `message`, `idle_report`, `task_request`, `task_result`, `review_verdict`
 ### Read my inbox
 
 ```
-exec: node /home/lingxufeng/claw/.openclaw/scripts/mail.mjs read --agent <me> --unread --limit 20
+exec: node $HOME/claw/.openclaw/scripts/mail.mjs read --agent <me> --unread --limit 20
 ```
 
 ### Mark read
 
 ```
-exec: node /home/lingxufeng/claw/.openclaw/scripts/mail.mjs mark --agent <me> --id <letter-id>
+exec: node $HOME/claw/.openclaw/scripts/mail.mjs mark --agent <me> --id <letter-id>
 ```
 
 ### Idle-cycle discipline (every heartbeat tick)
@@ -127,23 +127,23 @@ All MiniMax-generated assets MUST be saved to the dedicated output directory. Ne
 
 | Asset Type | Output Path | Model (from .env) |
 |-----------|-------------|-------------------|
-| Images | `/home/lingxufeng/claw/output/minimax/images/` | MINIMAX_IMAGE_MODEL |
-| TTS Audio | `/home/lingxufeng/claw/output/minimax/audio/tts/` | MINIMAX_TTS_MODEL / _HD / _TURBO |
-| Music | `/home/lingxufeng/claw/output/minimax/audio/music/` | MINIMAX_MUSIC_MODEL |
-| Video | `/home/lingxufeng/claw/output/minimax/video/` | MINIMAX_VIDEO_MODEL_T2V / _I2V / _SEF / _S2V |
-| Documents | `/home/lingxufeng/claw/output/minimax/documents/` | MiniMax DOCX/PDF/XLSX skills |
+| Images | `$HOME/claw/output/minimax/images/` | MINIMAX_IMAGE_MODEL |
+| TTS Audio | `$HOME/claw/output/minimax/audio/tts/` | MINIMAX_TTS_MODEL / _HD / _TURBO |
+| Music | `$HOME/claw/output/minimax/audio/music/` | MINIMAX_MUSIC_MODEL |
+| Video | `$HOME/claw/output/minimax/video/` | MINIMAX_VIDEO_MODEL_T2V / _I2V / _SEF / _S2V |
+| Documents | `$HOME/claw/output/minimax/documents/` | MiniMax DOCX/PDF/XLSX skills |
 
 **Naming convention**: `<date>-<agent>-<slug>.<ext>` (e.g. `2026-04-10-kouka-blog-hero.png`)
 
 **Example usage** (via exec):
 ```bash
 # TTS
-bash .openclaw/workspace-snowdrop/skills/minimax-multimodal-toolkit/scripts/tts/generate_voice.sh tts "<text>" -o /home/lingxufeng/claw/output/minimax/audio/tts/2026-04-10-kouka-blog-intro.mp3
+bash .openclaw/workspace-snowdrop/skills/minimax-multimodal-toolkit/scripts/tts/generate_voice.sh tts "<text>" -o $HOME/claw/output/minimax/audio/tts/2026-04-10-kouka-blog-intro.mp3
 
 # Image
-bash .openclaw/skills/minimax-multimodal/scripts/image/generate_image.sh --prompt "<prompt>" -o /home/lingxufeng/claw/output/minimax/images/2026-04-10-kouka-hero.png
+bash .openclaw/skills/minimax-multimodal/scripts/image/generate_image.sh --prompt "<prompt>" -o $HOME/claw/output/minimax/images/2026-04-10-kouka-hero.png
 
 # Music
-bash .openclaw/skills/minimax-multimodal/scripts/music/generate_music.sh --prompt "<prompt>" -o /home/lingxufeng/claw/output/minimax/audio/music/2026-04-10-snowdrop-ambient.mp3
+bash .openclaw/skills/minimax-multimodal/scripts/music/generate_music.sh --prompt "<prompt>" -o $HOME/claw/output/minimax/audio/music/2026-04-10-snowdrop-ambient.mp3
 ```
 

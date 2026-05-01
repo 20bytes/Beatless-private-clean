@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 import { runGeminiBridge, shouldDelegateToGemini } from "./adapters/gemini-bridge.js";
 
 const DEFAULTS = {
-  cwd: "/home/yarizakurahime/claw",
+  cwd: "$HOME/claw",
   timeoutSec: 240,
   model: "claude-sonnet-4-6",
   lanePrompt: [

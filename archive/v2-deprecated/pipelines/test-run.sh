@@ -8,7 +8,7 @@
 set -euo pipefail
 
 TIMESTAMP=$(date -u +"%Y%m%dT%H%M%SZ")
-LOG_DIR="/home/lingxufeng/claw/.openclaw/hermes/logs"
+LOG_DIR="$HOME/claw/.openclaw/hermes/logs"
 LOG_FILE="${LOG_DIR}/pr-followup-${TIMESTAMP}.log"
 RESULT_FILE="${LOG_DIR}/pr-followup-${TIMESTAMP}.result"
 SESSION_NAME="pr-followup"
@@ -54,18 +54,18 @@ OUTPUTS:
 - Write a run summary to ~/workspace/pr-stage/_followup/${TIMESTAMP}.md with sections: Processed, Pushed, Yielded, Waiting, Skipped.
 - At the end, print a JSON summary with keys: processed, pushed, yielded, waiting, skipped.
 
-Git identity: CrepuscularIRIS <serenitygp@qq.com>. Push target: the fork, never upstream.'
+Git identity: 20bytes <133551439+20bytes@users.noreply.github.com>. Push target: the fork, never upstream.'
 
 tmux new-session -d -s "$SESSION_NAME" bash -c "
-  export HOME=/home/lingxufeng
-  export PATH=/home/lingxufeng/.bun/bin:/home/lingxufeng/.local/bin:/home/lingxufeng/.cargo/bin:/usr/local/bin:/usr/bin:/bin
-  export GH_CONFIG_DIR=/home/lingxufeng/.config/gh
+  export HOME=$HOME
+  export PATH=$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+  export GH_CONFIG_DIR=$HOME/.config/gh
   export GITHUB_TOKEN=\$(gh auth token 2>/dev/null || echo '')
   cd \$HOME
 
   echo '=== pr-followup started at $(date -u) ===' | tee '$LOG_FILE'
 
-  timeout 2400 /home/lingxufeng/.bun/bin/claude \
+  timeout 2400 $HOME/.bun/bin/claude \
     --dangerously-skip-permissions \
     --model claude-opus-4-7 \
     --verbose \

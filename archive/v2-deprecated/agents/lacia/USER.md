@@ -1,7 +1,7 @@
 # USER.md - Operator Profile
 
 ## User
-- Name: yarizakurahime (Yari)
+- Name: <local-user>
 - Timezone: Asia/Shanghai
 - Goal: Build and run Beatless 5 Soul StepClaw
 

@@ -18,7 +18,7 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "[AUTO][MAINTAIN] Check gateway/cron/session health; inspect last 24h failures; review mailbox backlog; if needed delegate to Satonus/Methode; APPEND ONLY (do not overwrite existing file) a new timestamped block to /home/yarizakurahime/claw/Queue.md with issue, action, next step; output DONE/BLOCKED/NEXT.",
+        "message": "[AUTO][MAINTAIN] Check gateway/cron/session health; inspect last 24h failures; review mailbox backlog; if needed delegate to Satonus/Methode; APPEND ONLY (do not overwrite existing file) a new timestamped block to $HOME/claw/Queue.md with issue, action, next step; output DONE/BLOCKED/NEXT.",
         "timeoutSeconds": 1200
       },
       "delivery": {
@@ -53,7 +53,7 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "[AUTO][GITHUB-EXPLORE] Use github/gh-issues to scan openclaw/openclaw, openclaw/skills, CrepuscularIRIS/ClawRoom and ecosystem updates. Return top 5 findings with URL + impact + suggested action. IMPORTANT: do not edit/write any local files; output summary only.",
+        "message": "[AUTO][GITHUB-EXPLORE] Use github/gh-issues to scan openclaw/openclaw, openclaw/skills, 20bytes/ClawRoom and ecosystem updates. Return top 5 findings with URL + impact + suggested action. IMPORTANT: do not edit/write any local files; output summary only.",
         "timeoutSeconds": 1500
       },
       "delivery": {
@@ -89,7 +89,7 @@
       "wakeMode": "now",
       "payload": {
         "kind": "agentTurn",
-        "message": "[AUTO][PR-CYCLE] Check git/gh status for /home/yarizakurahime/claw and /home/yarizakurahime/claw/ClawRoom. For no-PR branches output a DRAFT PR plan; only create draft PR when latest commit contains [auto-pr]. For open PRs inspect CI/comments and propose deterministic fixes. IMPORTANT: avoid modifying local markdown logs; output summary only.",
+        "message": "[AUTO][PR-CYCLE] Check git/gh status for $HOME/claw and $HOME/claw/ClawRoom. For no-PR branches output a DRAFT PR plan; only create draft PR when latest commit contains [auto-pr]. For open PRs inspect CI/comments and propose deterministic fixes. IMPORTANT: avoid modifying local markdown logs; output summary only.",
         "timeoutSeconds": 1800
       },
       "delivery": {

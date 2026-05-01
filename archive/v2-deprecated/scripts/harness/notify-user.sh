@@ -21,7 +21,7 @@ shift || true
 DRY=""
 if [ "${1:-}" = "--dry-run" ]; then DRY="--dry-run"; fi
 
-cd /home/lingxufeng/claw
+cd $HOME/claw
 
 OUTPUT=$(./openclaw-local message broadcast \
   --targets me \

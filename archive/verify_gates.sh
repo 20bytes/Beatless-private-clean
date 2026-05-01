@@ -124,7 +124,7 @@ PY
       echo "review gate requires --codex-result <file>" >&2
       exit 2
     fi
-    python3 /home/yarizakurahime/claw/Beatless/scripts/parse_codex_result.py < "$CODEX_RESULT" > /tmp/codex_gate.json
+    python3 $HOME/claw/Beatless/scripts/parse_codex_result.py < "$CODEX_RESULT" > /tmp/codex_gate.json
     cat /tmp/codex_gate.json
     if grep -q '"verdict": "PASS"' /tmp/codex_gate.json; then
       echo "gate:codex_verdict PASS"

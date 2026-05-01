@@ -31,8 +31,8 @@ Score 4/4 → strong. 3/4 → proceed with caution. ≤2/4 → suggest reframing
 ## Step 0: Read Context + Initialize Planning (Lead Only)
 
 Read these files to understand the methodology:
-- /home/yarizakurahime/.claude/skills/research-dialectics/references/methodology-summary.md (compact version)
-- /home/yarizakurahime/.claude/agents/research-teammate.md (pipeline steps)
+- $HOME/.claude/skills/research-dialectics/references/methodology-summary.md (compact version)
+- $HOME/.claude/agents/research-teammate.md (pipeline steps)
 
 Read topic-specific files if they exist in the project working directory. Do NOT read Research_Methodology.md (501 lines) or TwoTopic.md (504 lines) — too expensive. Use the compact summary instead.
 
@@ -101,8 +101,8 @@ You are a Research Teammate on the "<team-name>" team. Your team lead is "team-l
 
 ## Instructions (follow EVERY step)
 
-1. Read the full pipeline at /home/yarizakurahime/.claude/agents/research-teammate.md — follow Steps 0A through 12 IN ORDER.
-2. Read /home/yarizakurahime/.claude/skills/research-dialectics/references/methodology-summary.md for methodology (compact version, saves tokens).
+1. Read the full pipeline at $HOME/.claude/agents/research-teammate.md — follow Steps 0A through 12 IN ORDER.
+2. Read $HOME/.claude/skills/research-dialectics/references/methodology-summary.md for methodology (compact version, saves tokens).
 3. Only read topic-specific files in the project working directory if they exist — do NOT read TwoTopic.md or Research_Methodology.md (too long, wastes context).
 
 4. Execute the full pipeline from your assigned entry dimension.
@@ -116,7 +116,7 @@ You are a Research Teammate on the "<team-name>" team. Your team lead is "team-l
 7. Invoke Codex for feasibility check:
    Use Skill tool: /codex:rescue "Assess feasibility of this research idea: [describe method]. Check: (1) compute requirements (single A100 budget), (2) implementation complexity, (3) novelty vs closest prior art. Be brutally honest."
 
-8. Write your report to /home/yarizakurahime/research/[project-dir]/teammate_report_[dimension].md
+8. Write your report to $HOME/research/[project-dir]/teammate_report_[dimension].md
 
 9. Send your verdict to lead:
    SendMessage(to="team-lead", summary="[Dimension] verdict", message="Verdict: [A-Tier/De-Risking/Incremental/Kill] — [2-sentence reasoning]")

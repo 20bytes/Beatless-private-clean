@@ -12,7 +12,7 @@
 set -euo pipefail
 
 TIMESTAMP=$(date -u +"%Y%m%dT%H%M%SZ")
-LOG_DIR="/home/lingxufeng/claw/.openclaw/hermes/logs"
+LOG_DIR="$HOME/claw/.openclaw/hermes/logs"
 LOG_FILE="${LOG_DIR}/blog-maintenance-${TIMESTAMP}.log"
 RESULT_FILE="${LOG_DIR}/blog-maintenance-${TIMESTAMP}.result"
 SESSION_NAME="blog-maintenance"
@@ -27,11 +27,11 @@ echo "  Monitor: tmux attach -t $SESSION_NAME"
 echo "  Result: $RESULT_FILE"
 
 tmux new-session -d -s "$SESSION_NAME" bash -c "
-  export HOME=/home/lingxufeng
-  export PATH=/home/lingxufeng/.bun/bin:/home/lingxufeng/.local/bin:/home/lingxufeng/.cargo/bin:/usr/local/bin:/usr/bin:/bin
-  export GH_CONFIG_DIR=/home/lingxufeng/.config/gh
+  export HOME=$HOME
+  export PATH=$HOME/.bun/bin:$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+  export GH_CONFIG_DIR=$HOME/.config/gh
   export GITHUB_TOKEN=\$(gh auth token 2>/dev/null || echo '')
-  export GITHUB_USER=CrepuscularIRIS
+  export GITHUB_USER=20bytes
   cd \$HOME/blog
 
   echo '=== blog-maintenance pipeline started at $(date -u) ===' | tee '$LOG_FILE'
@@ -40,7 +40,7 @@ tmux new-session -d -s "$SESSION_NAME" bash -c "
   echo '[feed-digest] refreshing github activity data...' | tee -a '$LOG_FILE'
   timeout 120 node \$HOME/blog/src/scripts/fetch-github-activity.mjs 2>&1 | tee -a '$LOG_FILE' || echo '[feed-digest] WARN: fetch failed, keeping previous data' | tee -a '$LOG_FILE'
 
-  timeout 3600 /home/lingxufeng/.bun/bin/claude \
+  timeout 3600 $HOME/.bun/bin/claude \
     --dangerously-skip-permissions \
     --verbose \
     --add-dir $HOME/blog \

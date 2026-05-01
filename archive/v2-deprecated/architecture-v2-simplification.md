@@ -249,7 +249,7 @@ Aoi                    MainAgent
     "pipeline": "github-hunt",
     "status": "SUCCESS",
     "artifacts": [
-      "/home/lingxufeng/workspace/pr-stage/20260411-charmbracelet-gum.md",
+      "$HOME/workspace/pr-stage/20260411-charmbracelet-gum.md",
       "https://github.com/charmbracelet/gum/issues/456",
       "https://github.com/user/gum/pull/1"
     ],

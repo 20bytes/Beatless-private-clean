@@ -10,7 +10,7 @@
     "lastRunMode": "local"
   },
   "browser": {
-    "executablePath": "/home/yarizakurahime/apps/chrome146/chrome-linux64/chrome"
+    "executablePath": "$HOME/apps/chrome146/chrome-linux64/chrome"
   },
   "acp": {
     "enabled": true,
@@ -156,8 +156,8 @@
       {
         "id": "lacia",
         "name": "Lacia",
-        "workspace": "/home/yarizakurahime/claw/.openclaw/workspace-lacia",
-        "agentDir": "/home/yarizakurahime/claw/.openclaw/agents/lacia/agent",
+        "workspace": "$HOME/claw/.openclaw/workspace-lacia",
+        "agentDir": "$HOME/claw/.openclaw/agents/lacia/agent",
         "model": {
           "primary": "stepfun/step-3.5-flash",
           "fallbacks": []
@@ -184,8 +184,8 @@
       {
         "id": "kouka",
         "name": "Kouka",
-        "workspace": "/home/yarizakurahime/claw/.openclaw/workspace-kouka",
-        "agentDir": "/home/yarizakurahime/claw/.openclaw/agents/kouka/agent",
+        "workspace": "$HOME/claw/.openclaw/workspace-kouka",
+        "agentDir": "$HOME/claw/.openclaw/agents/kouka/agent",
         "model": {
           "primary": "stepfun/step-3.5-flash",
           "fallbacks": []
@@ -205,8 +205,8 @@
       {
         "id": "methode",
         "name": "Methode",
-        "workspace": "/home/yarizakurahime/claw/.openclaw/workspace-methode",
-        "agentDir": "/home/yarizakurahime/claw/.openclaw/agents/methode/agent",
+        "workspace": "$HOME/claw/.openclaw/workspace-methode",
+        "agentDir": "$HOME/claw/.openclaw/agents/methode/agent",
         "model": {
           "primary": "stepfun/step-3.5-flash",
           "fallbacks": []
@@ -226,8 +226,8 @@
       {
         "id": "satonus",
         "name": "Satonus",
-        "workspace": "/home/yarizakurahime/claw/.openclaw/workspace-satonus",
-        "agentDir": "/home/yarizakurahime/claw/.openclaw/agents/satonus/agent",
+        "workspace": "$HOME/claw/.openclaw/workspace-satonus",
+        "agentDir": "$HOME/claw/.openclaw/agents/satonus/agent",
         "model": {
           "primary": "stepfun/step-3.5-flash",
           "fallbacks": []
@@ -247,8 +247,8 @@
       {
         "id": "snowdrop",
         "name": "Snowdrop",
-        "workspace": "/home/yarizakurahime/claw/.openclaw/workspace-snowdrop",
-        "agentDir": "/home/yarizakurahime/claw/.openclaw/agents/snowdrop/agent",
+        "workspace": "$HOME/claw/.openclaw/workspace-snowdrop",
+        "agentDir": "$HOME/claw/.openclaw/agents/snowdrop/agent",
         "model": {
           "primary": "stepfun/step-3.5-flash",
           "fallbacks": []
@@ -388,7 +388,7 @@
     ],
     "load": {
       "extraDirs": [
-        "/home/yarizakurahime/claw/.openclaw/skills"
+        "$HOME/claw/.openclaw/skills"
       ],
       "watch": true,
       "watchDebounceMs": 1500
@@ -833,7 +833,7 @@
         "enabled": true,
         "config": {
           "enabled": true,
-          "defaultCwd": "/home/yarizakurahime/claw",
+          "defaultCwd": "$HOME/claw",
           "timeoutSec": 240,
           "models": {
             "architect": "opus-4.6",
@@ -850,10 +850,10 @@
           "enabled": true,
           "baseUrl": "http://127.0.0.1:3001",
           "requestTimeoutSec": 20,
-          "openRoomDir": "/home/yarizakurahime/claw/OpenRoom",
-          "devCommand": "pnpm --dir /home/yarizakurahime/claw/OpenRoom dev",
-          "logFile": "/home/yarizakurahime/claw/.openclaw/logs/openroom-dev.log",
-          "pidFile": "/home/yarizakurahime/claw/.openclaw/openroom-dev.pid",
+          "openRoomDir": "$HOME/claw/OpenRoom",
+          "devCommand": "pnpm --dir $HOME/claw/OpenRoom dev",
+          "logFile": "$HOME/claw/.openclaw/logs/openroom-dev.log",
+          "pidFile": "$HOME/claw/.openclaw/openroom-dev.pid",
           "autoStartOnHealthCheck": false,
           "startupWaitSec": 45
         }
@@ -863,7 +863,7 @@
       "openclaw-stepfun": {
         "source": "npm",
         "spec": "openclaw-stepfun@0.2.14",
-        "installPath": "/home/yarizakurahime/claw/.openclaw/extensions/openclaw-stepfun",
+        "installPath": "$HOME/claw/.openclaw/extensions/openclaw-stepfun",
         "version": "0.2.14",
         "resolvedName": "openclaw-stepfun",
         "resolvedVersion": "0.2.14",
@@ -876,7 +876,7 @@
       "openclaw-codex-app-server": {
         "source": "clawhub",
         "spec": "clawhub:openclaw-codex-app-server@0.5.0",
-        "installPath": "/home/yarizakurahime/claw/.openclaw/extensions/openclaw-codex-app-server",
+        "installPath": "$HOME/claw/.openclaw/extensions/openclaw-codex-app-server",
         "version": "0.5.0",
         "integrity": "REDACTED",
         "resolvedAt": "2026-03-30T16:06:40.836Z",
@@ -889,7 +889,7 @@
       "lossless-claw": {
         "source": "npm",
         "spec": "@martian-engineering/lossless-claw",
-        "installPath": "/home/yarizakurahime/claw/.openclaw/extensions/lossless-claw",
+        "installPath": "$HOME/claw/.openclaw/extensions/lossless-claw",
         "version": "0.5.2",
         "resolvedName": "@martian-engineering/lossless-claw",
         "resolvedVersion": "0.5.2",
@@ -902,22 +902,22 @@
       "opik-openclaw": {
         "source": "archive",
         "sourcePath": "/tmp/opik-openclaw-0.2.9.tgz",
-        "installPath": "/home/yarizakurahime/claw/.openclaw/extensions/opik-openclaw",
+        "installPath": "$HOME/claw/.openclaw/extensions/opik-openclaw",
         "version": "0.2.9",
         "installedAt": "2026-03-30T16:11:02.567Z"
       },
       "openclaw-rawcli-router": {
         "source": "path",
-        "spec": "/home/yarizakurahime/claw/.openclaw/extensions/openclaw-rawcli-router",
-        "installPath": "/home/yarizakurahime/claw/.openclaw/extensions/openclaw-rawcli-router",
+        "spec": "$HOME/claw/.openclaw/extensions/openclaw-rawcli-router",
+        "installPath": "$HOME/claw/.openclaw/extensions/openclaw-rawcli-router",
         "version": "0.1.0",
         "resolvedAt": "2026-04-02T04:22:03Z",
         "installedAt": "2026-04-02T04:22:03Z"
       },
       "openclaw-openroom-bridge": {
         "source": "path",
-        "spec": "/home/yarizakurahime/claw/.openclaw/extensions/openclaw-openroom-bridge",
-        "installPath": "/home/yarizakurahime/claw/.openclaw/extensions/openclaw-openroom-bridge",
+        "spec": "$HOME/claw/.openclaw/extensions/openclaw-openroom-bridge",
+        "installPath": "$HOME/claw/.openclaw/extensions/openclaw-openroom-bridge",
         "version": "0.1.0",
         "resolvedAt": "2026-04-02T13:43:18Z",
         "installedAt": "2026-04-02T13:43:18Z"

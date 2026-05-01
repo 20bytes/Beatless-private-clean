@@ -74,13 +74,13 @@ When the cron wakes me:
 ## Inter-Agent Idle Aggregation (every heartbeat tick)
 
 On EVERY heartbeat tick (not just the daily cron):
-1. Read my mailbox: `exec node /home/lingxufeng/claw/.openclaw/scripts/mail.mjs read --agent lacia --unread --limit 20`
+1. Read my mailbox: `exec node $HOME/claw/.openclaw/scripts/mail.mjs read --agent lacia --unread --limit 20`
 2. Count unread `idle_report` letters from the 4 non-Lacia agents.
 3. **If ≥ 3 agents reported idle AND no active TaskEnvelope in Queue.md**:
    - Push a notification to the user via StepFun:
-     `exec bash /home/lingxufeng/claw/.openclaw/scripts/notify-user.sh "<N>/4 Beatless agents idle — no task in queue. What should I work on next? (idle: <agent list>)"`
+     `exec bash $HOME/claw/.openclaw/scripts/notify-user.sh "<N>/4 Beatless agents idle — no task in queue. What should I work on next? (idle: <agent list>)"`
    - After push, mark all idle_report letters read:
-     `exec node /home/lingxufeng/claw/.openclaw/scripts/mail.mjs mark --agent lacia --id <id>` (for each)
+     `exec node $HOME/claw/.openclaw/scripts/mail.mjs mark --agent lacia --id <id>` (for each)
 4. If < 3 idle or active task exists → just mark stale idle_reports read, do NOT push (avoid noise).
 
 Cooldown: do not push more than once every 60 minutes. Track last push timestamp in `.openclaw/mailbox/lacia.last-push.txt`.
@@ -122,9 +122,9 @@ IDLE → PHASE_A_DISPATCHED → PHASE_A_COMPLETE → PHASE_B_DISPATCHED → PHAS
 | Phase | Agent | Task | Timeout |
 |-------|-------|------|---------|
 | A | Snowdrop | Find 5 candidate repos (5k-30k stars, bug issues) via `claude_code_cli` with web_fetch | 1h |
-| B | Methode | Clone repos to `/home/lingxufeng/workspace/ghsim/`, run AgentTeam (scanner+analyst+patcher) | 3h |
+| B | Methode | Clone repos to `$HOME/workspace/ghsim/`, run AgentTeam (scanner+analyst+patcher) | 3h |
 | C | Satonus | Review patches via `claude_code_cli` with "codex review" | 1h |
-| D | Kouka | Package PR artifacts to `/home/lingxufeng/workspace/pr-stage/` | 1h |
+| D | Kouka | Package PR artifacts to `$HOME/workspace/pr-stage/` | 1h |
 
 ### AgentTeam Default for Multi-Repo Discovery
 
@@ -132,7 +132,7 @@ When dispatching PHASE_B to Methode for GitHub discovery:
 ```
 mail send --from lacia --to methode --type task_request
   --subject "ghsim: clone+analyze 5 repos"
-  --body "Candidates at /home/lingxufeng/workspace/ghsim/candidates.yaml.
+  --body "Candidates at $HOME/workspace/ghsim/candidates.yaml.
           For EACH repo, use claude_code_cli with AgentTeam:
           --agents '{\"scanner\":{...},\"analyst\":{...},\"patcher\":{...}}'
           Save team-report.md + patches per repo.
